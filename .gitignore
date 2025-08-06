@@ -1,0 +1,5 @@
+data/
+*.nii
+*.nii.gz
+*.pt
+__pycache__/
