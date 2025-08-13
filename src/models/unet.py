@@ -62,13 +62,14 @@ class UNetEncoder(nn.Module):
     espacial del volumen de entrada y aumentar el número de canales, capturando 
     características de bajo nivel y semánticas.
     """
-    def __init__(self, in_channels: int):
+    def __init__(self, in_channels: int, base_channels: int = 64):
         super(UNetEncoder, self).__init__()
-        self.enc_block1 = EncoderBlock(in_channels, 64)
-        self.enc_block2 = EncoderBlock(64, 128)
-        self.enc_block3 = EncoderBlock(128, 256)
-        self.enc_block4 = EncoderBlock(256, 512)
-        self.bottleneck = DoubleConv(512, 1024)
+        # Los canales se escalan en cada etapa
+        self.enc_block1 = EncoderBlock(in_channels, base_channels)
+        self.enc_block2 = EncoderBlock(base_channels, base_channels * 2)
+        self.enc_block3 = EncoderBlock(base_channels * 2, base_channels * 4)
+        self.enc_block4 = EncoderBlock(base_channels * 4, base_channels * 8)
+        self.bottleneck = DoubleConv(base_channels * 8, base_channels * 16)
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, ...]:
         conv1, pool1 = self.enc_block1(x)
@@ -149,7 +150,7 @@ class UNet(nn.Module):
     """
     def __init__(self,  in_channels: int = 1, num_classes: int = 2, base_channels: int = 64):
         super(UNet, self).__init__()
-        self.encoder = UNetEncoder(in_channels)
+        self.encoder = UNetEncoder(in_channels, base_channels)
         self.decoder = UNetDecoder(base_channels)
         self.out_conv = nn.Conv3d(base_channels, num_classes, kernel_size=1)
 
@@ -164,3 +165,4 @@ class UNet(nn.Module):
         output = self.out_conv(decoder_out)
         return output
   
+
