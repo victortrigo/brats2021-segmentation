@@ -393,7 +393,9 @@ class Output(nn.Module):
         p1 = self.sigmoid(c1)
 
         final_mask = torch.cat([p1, p2, p3], dim=1)
-        return final_mask, (p1, p2, p3)
+        background = 1 - torch.clamp(final_mask.sum(dim=1, keepdim=True), max=1.0)
+        final_mask_4ch = torch.cat([background, final_mask], dim=1)
+        return final_mask_4ch, (p1, p2, p3)
 
 # Modelo completo CLCU-Net
 class CLCUNet(nn.Module):
@@ -421,8 +423,6 @@ class CLCUNet(nn.Module):
         """
         e1, e2, e3, b = self.encoder(x)
         d1, d2, d3 = self.decoder(b, e3, e2, e1)
-        final_mask, _ = self.output(d1, d2, d3)
-        background = 1 - torch.clamp(final_mask.sum(dim=1, keepdim=True), max=1.0)
-        final_mask_4ch = torch.cat([background, final_mask], dim=1)
+        final_mask_4ch, _ = self.output(d1, d2, d3)
         return final_mask_4ch
-      
+
