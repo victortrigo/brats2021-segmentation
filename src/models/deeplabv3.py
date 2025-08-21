@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple, Type
 
+
 class SeparableConv(nn.Module):
     """
     Bloque de convolución 3D separable.
@@ -22,6 +23,7 @@ class SeparableConv(nn.Module):
         x = self.bn(x)
         x = self.relu(x)
         return x
+
 
 class EntryFlow(nn.Module):
     """
@@ -86,6 +88,7 @@ class EntryFlow(nn.Module):
         x = self.relu(x)
         return low_level, x
 
+
 class MiddleFlow(nn.Module):
     """
     Flujo intermedio del backbone. Compuesto por 16 bloques residuales.
@@ -108,6 +111,7 @@ class MiddleFlow(nn.Module):
             x = block(x)
             x = x + residual
         return x
+
 
 class ExitFlow(nn.Module):
     """
@@ -139,6 +143,7 @@ class ExitFlow(nn.Module):
         x = self.sepconv3(x)
         return x
 
+
 class BackboneXception(nn.Module):
     """
     Backbone completo de Xception 3D, compuesto por los tres flujos.
@@ -154,6 +159,7 @@ class BackboneXception(nn.Module):
         x = self.middle(x)
         high_level = self.exit(x)
         return low_level, high_level
+
 
 class ASPP(nn.Module):
     """
@@ -208,6 +214,22 @@ class ASPP(nn.Module):
         x = self.project(x)
         return x
 
+
+class Encoder(nn.Module):
+    """
+    Combinación del backbone Xception y el módulo ASPP.
+    """
+    def __init__(self, in_channels: int = 4, out_channels: int = 256):
+        super(Encoder, self).__init__()
+        self.backbone = BackboneXception(in_channels=in_channels)
+        self.aspp = ASPP(in_channels=2048, out_channels=out_channels)
+
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        low_level, high_level = self.backbone(x)
+        aspp_output = self.aspp(high_level)
+        return low_level, aspp_output
+
+
 class Decoder(nn.Module):
     """
     Decodificador de DeepLabv3+ que combina características de alto y bajo nivel.
@@ -238,21 +260,17 @@ class Decoder(nn.Module):
         x = self.out_conv(x)
         return x
 
+
 class DeepLabV3Plus(nn.Module):
     """
     Implementación completa del modelo DeepLabv3+.
     """
     def __init__(self, in_channels: int, num_classes: int):
         super(DeepLabV3Plus, self).__init__()
-        self.backbone = BackboneXception(in_channels=in_channels)
-        self.aspp = ASPP(in_channels=2048, out_channels=256)
+        self.encoder = Encoder(in_channels=in_channels)
         self.decoder = Decoder(low_level_in=128, num_classes=num_classes)
-        # La línea final_upsample no es necesaria ya que el decoder realiza el upsampling final.
-        # self.final_upsample = nn.Upsample(scale_factor=1, mode='trilinear', align_corners=False)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        low_level, high_level = self.backbone(x)
-        aspp_output = self.aspp(high_level)
+        low_level, aspp_output = self.encoder(x)
         output = self.decoder(aspp_output, low_level)
         return output
-        
