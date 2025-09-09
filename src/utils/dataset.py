@@ -48,7 +48,6 @@ class Dataset(BaseDataset):
         self.masks_fps: List[str] = [os.path.join(masks_dir, image_id) for image_id in self.ids_y]
 
         self.class_values: List[int] = [CLASSES.index(cls) for cls in classes] if classes else []
-        print(self.class_values)
 
         self.augmentation: Optional[callable] = augmentation
         self.preprocessing: Optional[callable] = preprocessing
@@ -99,7 +98,9 @@ class Dataset(BaseDataset):
 
         image2: np.ndarray = np.asarray(image_data)
         mask2: np.ndarray = np.asarray(mask_data)
-        
-        print("Valores únicos en la máscara:", np.unique(mask2))
 
+        # Normalizar etiquetas 
+        mask2[mask2 == 4] = 3
+        mask2 = mask2.astype(np.float32)
+        
         return image2, mask2
