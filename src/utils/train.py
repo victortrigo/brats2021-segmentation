@@ -175,7 +175,7 @@ class Epoch:
         logs: Dict[str, float] = {}
         loss_meter = AverageValueMeter()
         metrics_meters: Dict[str, AverageValueMeter] = {
-            metric.__name__: AverageValueMeter() for metric in self.metrics
+            metric.name: AverageValueMeter() for metric in self.metrics
         }
 
         with tqdm(
@@ -186,6 +186,7 @@ class Epoch:
         ) as iterator:
             for x, y in iterator:
                 x, y = x.to(self.device), y.to(self.device)
+                y = y.long()
                 loss, y_pred = self.batch_update(x, y)
 
                 # Actualizar logs de pérdida
@@ -193,11 +194,12 @@ class Epoch:
                 loss_meter.add(loss_value)
                 loss_logs: Dict[str, float] = {f"{self.loss.__name__}": loss_meter.mean}
                 logs.update(loss_logs)
+                y_squeezed = y.squeeze(dim=1)
 
                 # Actualizar logs de métricas
                 for metric_fn in self.metrics:
-                    metric_value: float = metric_fn(y_pred, y).cpu().detach().numpy().mean()
-                    metrics_meters[metric_fn.__name__].add(metric_value)
+                    metric_value: float = metric_fn(y_pred, y_squeezed).cpu().detach().numpy().mean()
+                    metrics_meters[metric_fn.name].add(metric_value)
                 metrics_logs: Dict[str, float] = {k: v.mean for k, v in metrics_meters.items()}
                 logs.update(metrics_logs)
 
