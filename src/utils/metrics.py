@@ -358,6 +358,7 @@ class IoU(Metric):
         self.threshold = threshold
         self.activation = Activation(activation)
         self.ignore_channels = ignore_channels
+        self.name = kwargs.get('name', 'iou_score')
 
     def forward(self, y_pr: torch.Tensor, y_gt: torch.Tensor) -> torch.Tensor:
         y_pr_activated = self.activation(y_pr)
@@ -374,6 +375,8 @@ class Fscore(Metric):
     """
     Métrica F-score.
     """
+    __name__ = 'fscore'
+    
     def __init__(self, beta: float = 1, eps: float = 1e-7, threshold: float = 0.5,
                  activation: Optional[str] = None, ignore_channels: Optional[List[int]] = None, **kwargs):
         super().__init__(**kwargs)
@@ -382,6 +385,7 @@ class Fscore(Metric):
         self.threshold = threshold
         self.activation = Activation(activation)
         self.ignore_channels = ignore_channels
+        self.name = kwargs.get('name', 'fscore')
 
     def forward(self, y_pr: torch.Tensor, y_gt: torch.Tensor) -> torch.Tensor:
         y_pr_activated = self.activation(y_pr)
@@ -399,12 +403,15 @@ class Accuracy(Metric):
     """
     Métrica de precisión (Accuracy).
     """
+    __name__ = 'accuracy'
+    
     def __init__(self, threshold: float = 0.5, activation: Optional[str] = None,
                  ignore_channels: Optional[List[int]] = None, **kwargs):
         super().__init__(**kwargs)
         self.threshold = threshold
         self.activation = Activation(activation)
         self.ignore_channels = ignore_channels
+        self.name = kwargs.get('name', 'accuracy')
 
     def forward(self, y_pr: torch.Tensor, y_gt: torch.Tensor) -> torch.Tensor:
         y_pr_activated = self.activation(y_pr)
@@ -420,6 +427,8 @@ class Recall(Metric):
     """
     Métrica de recall.
     """
+    __name__ = 'recall'
+    
     def __init__(self, eps: float = 1e-7, threshold: float = 0.5, activation: Optional[str] = None,
                  ignore_channels: Optional[List[int]] = None, **kwargs):
         super().__init__(**kwargs)
@@ -427,6 +436,7 @@ class Recall(Metric):
         self.threshold = threshold
         self.activation = Activation(activation)
         self.ignore_channels = ignore_channels
+        self.name = kwargs.get('name', 'recall')
 
     def forward(self, y_pr: torch.Tensor, y_gt: torch.Tensor) -> torch.Tensor:
         y_pr_activated = self.activation(y_pr)
@@ -443,6 +453,8 @@ class Precision(Metric):
     """
     Métrica de precisión (Precision).
     """
+    __name__ = 'precision'
+    
     def __init__(self, eps: float = 1e-7, threshold: float = 0.5, activation: Optional[str] = None,
                  ignore_channels: Optional[List[int]] = None, **kwargs):
         super().__init__(**kwargs)
@@ -450,6 +462,7 @@ class Precision(Metric):
         self.threshold = threshold
         self.activation = Activation(activation)
         self.ignore_channels = ignore_channels
+        self.name = kwargs.get('name', 'precision')
 
     def forward(self, y_pr: torch.Tensor, y_gt: torch.Tensor) -> torch.Tensor:
         y_pr_activated = self.activation(y_pr)
@@ -460,4 +473,3 @@ class Precision(Metric):
             threshold=self.threshold,
             ignore_channels=self.ignore_channels,
         )
-        
