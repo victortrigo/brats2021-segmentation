@@ -102,5 +102,9 @@ class Dataset(BaseDataset):
         # Normalizar etiquetas 
         mask2[mask2 == 4] = 3
         mask2 = mask2.astype(np.float32)
+
+        # Convierte el array de NumPy a un tensor de PyTorch
+        image_tensor = torch.from_numpy(image2)
+        mask_tensor = torch.from_numpy(mask2).long()
         
-        return image2, mask2
+        return image_tensor, mask_tensor
