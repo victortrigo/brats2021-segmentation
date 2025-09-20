@@ -1,5 +1,22 @@
+# Directorios de datos y modelos (DVC los versiona, Git los ignora)
 data/
-*.nii
-*.nii.gz
-*.pt
+models/
+# *.nii
+# *.nii.gz
+
+# Archivos de cache
+# .dvc/cache/
 __pycache__/
+
+# Logs de entrenamiento y resultados
+logs/
+reports/
+
+# Modelos binarios de PyTorch
+*.pt
+*.pth
+
+# Entornos virtuales
+.venv/
+venv/
+env/

@@ -1,0 +1,17 @@
+stages:
+  train:
+    cmd: python src/train_main.py --config configs/unet_config.yaml
+    deps:
+      - src/train.py
+      - src/dataset.py
+      - src/unet.py
+      - src/deeplabv3.py
+      - src/deeplabv3sam.py
+      - src/clcu_net.py
+      - data/processed/
+      - configs/
+    outs:
+      - models/UNet:
+          cache: true
+      - reports/metrics.csv:
+          cache: true

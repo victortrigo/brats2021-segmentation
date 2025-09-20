@@ -1,0 +1,132 @@
+import sys
+import yaml
+import torch
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+from typing import Dict, Any
+import os
+
+from . import dataset, train, metrics, unet, deeplabv3, deeplabv3sam, clcu_net
+from torch.nn import BCEWithLogitsLoss
+from torch.optim import Adam, SGD
+
+from .train import TrainEpoch, ValidEpoch
+from .metrics import DiceLoss, JaccardLoss, IoU, Accuracy, Fscore, Recall, Precision
+
+# Definición del dispositivo para el entrenamiento
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+# Diccionarios de mapeo para optimizadores y funciones de pérdida
+OPTIMIZERS = {
+    "Adam": Adam,
+    "SGD": SGD,
+}
+
+LOSSES = {
+    "DiceLoss": DiceLoss,
+    "BCEWithLogitsLoss": BCEWithLogitsLoss,
+    "JaccardLoss": JaccardLoss,
+}
+
+def get_model(config: Dict[str, Any]) -> torch.nn.Module:
+    """Crea y devuelve el modelo basado en la configuración."""
+    model_name = config['model']['name']
+    model_params = {k: v for k, v in config['model'].items() if k != 'name'}
+    
+    if model_name == "UNet":
+        return unet.UNet(**model_params)
+    elif model_name == "DeepLabV3+":
+        return deeplabv3.DeepLabV3Plus(**model_params)
+    elif model_name == "DeepLabV3+SAM":
+        return deeplabv3sam.DeepLabV3PlusSAM(**model_params)
+    elif model_name == "CLCUNet":
+        return clcu_net.CLCUNet(**model_params)
+    else:
+        raise ValueError(f"Modelo no soportado: {model_name}")
+    
+
+def main(config_path: str):
+    """Función principal para el entrenamiento."""
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    # Carga de datos
+    DATA_DIR = config['paths']['data_dir']
+    CLASSES = ['background', 'NCR', 'ED', 'ET']
+
+    x_train_dir = os.path.join(DATA_DIR, 'X_train')
+    y_train_dir = os.path.join(DATA_DIR, 'y_train')
+    x_valid_dir = os.path.join(DATA_DIR, 'X_val')
+    y_valid_dir = os.path.join(DATA_DIR, 'y_val')
+
+    train_dataset = dataset.Dataset(x_train_dir, y_train_dir, CLASSES)
+    valid_dataset = dataset.Dataset(x_valid_dir, y_valid_dir, CLASSES)
+
+    train_loader = DataLoader(train_dataset, batch_size=config['training']['batch_size'], shuffle=True, num_workers=0)
+    valid_loader = DataLoader(valid_dataset, batch_size=config['training']['batch_size'], shuffle=False, num_workers=0)
+
+    metrics = [
+        IoU(threshold=0.5),
+        Accuracy(threshold=0.5),
+        Fscore(threshold=0.5),
+        Recall(threshold=0.5),
+        Precision(threshold=0.5),
+    ]
+
+    # Carga del modelo
+    model = get_model(config)
+
+    # Instanciación dinámica de optimizador y pérdida
+    optimizer_class = OPTIMIZERS[config['training']['optimizer']]
+    optimizer = optimizer_class(model.parameters(), lr=config['training']['learning_rate'])
+    
+    loss_class = LOSSES[config['training']['loss']]
+    loss = loss_class()
+
+    print(f"Iniciando el entrenamiento del modelo: {config['model']['name']}")
+
+    # Lógica de entrenamiento
+    train_epoch = TrainEpoch(
+        model,
+        loss=loss,
+        metrics=metrics,
+        optimizer=optimizer,
+        device=DEVICE,
+        verbose=True,
+    )
+
+    valid_epoch = ValidEpoch(
+        model,
+        loss=loss,
+        metrics=metrics,
+        device=DEVICE,
+        verbose=True,
+    )
+
+    max_score = 0
+    epochs = config['training']['epochs']
+
+    for i in range(0, epochs):
+
+        print('\nEpoch: {}'.format(i))
+        train_logs = train_epoch.run(train_loader)
+        valid_logs = valid_epoch.run(valid_loader)
+
+        # Save the model with best iou score
+        if max_score < valid_logs['iou_score']:
+            max_score = valid_logs['iou_score']
+            torch.save(model.state_dict(), f"{config['paths']['models_dir']}{config['model']['name']}.pt")
+            print('Model saved!')
+
+        if i == 50:
+            optimizer.param_groups[0]['lr'] = 1e-5
+            print('Decrease decoder learning rate to 1e-5!')
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, required=True, help="Ruta al archivo de configuración YAML.")
+    args = parser.parse_args()
+    
+    main(args.config)
