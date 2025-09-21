@@ -1,5 +1,10 @@
-# Directorios de datos y modelos (DVC los versiona, Git los ignora)
-data/
+# Ignora todo el contenido de la carpeta processed
+/data/processed/
+
+# Pero NO ignores los archivos .dvc
+!/data/processed/.dvc
+
+
 models/
 # *.nii
 # *.nii.gz

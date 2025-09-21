@@ -30,22 +30,39 @@ class Dataset(BaseDataset):
             augmentation (Optional[callable], optional): Función de aumento de datos.
             preprocessing (Optional[callable], optional): Función de preprocesamiento.
         """
-        valid_modalities: List[str] = ['flair.nii', 't1.nii', 't1ce.nii', 't2.nii']
-        
-        self.ids_x: List[str] = sorted([
-            d for d in os.listdir(images_dir)
-            if os.path.isdir(os.path.join(images_dir, d)) and
-               any(f.lower().endswith(tuple(valid_modalities)) for f in os.listdir(os.path.join(images_dir, d)))
-        ])
-        
-        self.ids_y: List[str] = sorted([
-            d for d in os.listdir(masks_dir)
-            if os.path.isdir(os.path.join(masks_dir, d)) and
-               any(f.lower().endswith('seg.nii') for f in os.listdir(os.path.join(masks_dir, d)))
-        ])
+        valid_modalities: List[str] = ['flair.nii.gz', 't1.nii.gz', 't1ce.nii.gz', 't2.nii.gz']
 
-        self.images_fps: List[str] = [os.path.join(images_dir, image_id) for image_id in self.ids_x]
-        self.masks_fps: List[str] = [os.path.join(masks_dir, image_id) for image_id in self.ids_y]
+        # valid_modalities: List[str] = ['flair.nii', 't1.nii', 't1ce.nii', 't2.nii']
+        
+
+        # Primero, obtén todos los IDs de pacientes en cada directorio
+        ids_x_temp = set([d for d in os.listdir(images_dir) if os.path.isdir(os.path.join(images_dir, d))])
+        ids_y_temp = set([d for d in os.listdir(masks_dir) if os.path.isdir(os.path.join(masks_dir, d))])
+        
+        # Encuentra los IDs que están en AMBOS directorios
+        common_ids = sorted(list(ids_x_temp.intersection(ids_y_temp)))
+        
+        # Filtra la lista común para asegurarte de que cada carpeta tiene los archivos necesarios
+        self.ids: List[str] = [
+            d for d in common_ids
+            if any(f.lower().endswith(tuple(valid_modalities)) for f in os.listdir(os.path.join(images_dir, d))) and
+               any(f.lower().endswith('seg.nii.gz') for f in os.listdir(os.path.join(masks_dir, d)))
+        ]
+
+        # self.ids_x: List[str] = sorted([
+        #     d for d in os.listdir(images_dir)
+        #     if os.path.isdir(os.path.join(images_dir, d)) and
+        #        any(f.lower().endswith(tuple(valid_modalities)) for f in os.listdir(os.path.join(images_dir, d)))
+        # ])
+        
+        # self.ids_y: List[str] = sorted([
+        #     d for d in os.listdir(masks_dir)
+        #     if os.path.isdir(os.path.join(masks_dir, d)) and
+        #        any(f.lower().endswith('seg.nii') for f in os.listdir(os.path.join(masks_dir, d)))
+        # ])
+
+        self.images_fps: List[str] = [os.path.join(images_dir, image_id) for image_id in self.ids]
+        self.masks_fps: List[str] = [os.path.join(masks_dir, image_id) for image_id in self.ids]
 
         self.class_values: List[int] = [CLASSES.index(cls) for cls in classes] if classes else []
 
@@ -56,7 +73,7 @@ class Dataset(BaseDataset):
         """
         Devuelve el número total de muestras en el dataset.
         """
-        return len(self.ids_x)
+        return len(self.ids)
 
     def __getitem__(self, i: int) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -81,8 +98,8 @@ class Dataset(BaseDataset):
         # Lógica para cargar las imágenes
         for file in files_image:
             file_path: str = os.path.join(folder_image, file)
-            if file.endswith('flair.nii') or file.endswith('t1.nii') or \
-               file.endswith('t1ce.nii') or file.endswith('t2.nii'):
+            if file.endswith('flair.nii.gz') or file.endswith('t1.nii.gz') or \
+               file.endswith('t1ce.nii.gz') or file.endswith('t2.nii.gz'):
                 img = nib.load(file_path)
                 img_new = np.array(img.get_fdata(caching='fill'))
                 image_data.append(img_new)
@@ -91,7 +108,7 @@ class Dataset(BaseDataset):
         # Lógica para cargar las máscaras
         for file in files_mask:
             file_path: str = os.path.join(folder_mask, file)
-            if file.endswith('seg.nii'):
+            if file.endswith('seg.nii.gz'):
                 img = nib.load(file_path)
                 img_new = np.array(img.get_fdata(caching='fill'))
                 mask_data.append(img_new)

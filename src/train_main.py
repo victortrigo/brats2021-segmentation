@@ -5,10 +5,12 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from typing import Dict, Any
 import os
+from datetime import datetime
 
 from . import dataset, train, metrics, unet, deeplabv3, deeplabv3sam, clcu_net
 from torch.nn import BCEWithLogitsLoss
 from torch.optim import Adam, SGD
+from torch.utils.tensorboard import SummaryWriter
 
 from .train import TrainEpoch, ValidEpoch
 from .metrics import DiceLoss, JaccardLoss, IoU, Accuracy, Fscore, Recall, Precision
@@ -85,6 +87,13 @@ def main(config_path: str):
 
     print(f"Iniciando el entrenamiento del modelo: {config['model']['name']}")
 
+    # Crea un nombre de corrida único al inicio de la ejecución
+    now = datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_name = f"{config['model']['name']}_{now}"
+
+    # Crea el escritor de TensorBoard con el nombre único
+    writer = SummaryWriter(os.path.join('runs', run_name))
+
     # Lógica de entrenamiento
     train_epoch = TrainEpoch(
         model,
@@ -112,16 +121,24 @@ def main(config_path: str):
         train_logs = train_epoch.run(train_loader)
         valid_logs = valid_epoch.run(valid_loader)
 
+        # Registra las métricas en TensorBoard
+        writer.add_scalar('Loss/train', train_logs['dice_loss'], i)
+        writer.add_scalar('IoU/train', train_logs['iou_score'], i)
+        writer.add_scalar('Loss/validation', valid_logs['dice_loss'], i)
+        writer.add_scalar('IoU/validation', valid_logs['iou_score'], i)
+
         # Save the model with best iou score
         if max_score < valid_logs['iou_score']:
             max_score = valid_logs['iou_score']
-            torch.save(model.state_dict(), f"{config['paths']['models_dir']}{config['model']['name']}.pt")
-            print('Model saved!')
+            model_path = os.path.join(config['paths']['models_dir'], f"{config['model']['name']}.pt")
+            torch.save(model.state_dict(), model_path)
+            print(f'Modelo guardado en {model_path}')
 
         if i == 50:
             optimizer.param_groups[0]['lr'] = 1e-5
             print('Decrease decoder learning rate to 1e-5!')
 
+    writer.close()
 
 if __name__ == "__main__":
     import argparse
