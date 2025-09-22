@@ -25,3 +25,5 @@ reports/
 .venv/
 venv/
 env/
+/models
+/reports

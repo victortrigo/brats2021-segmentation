@@ -1,0 +1,4 @@
+[core]
+    remote = my-cache
+['remote "my-cache"']
+    url = D:/.dvccache

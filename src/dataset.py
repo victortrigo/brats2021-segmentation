@@ -32,34 +32,32 @@ class Dataset(BaseDataset):
         """
         valid_modalities: List[str] = ['flair.nii.gz', 't1.nii.gz', 't1ce.nii.gz', 't2.nii.gz']
 
-        # valid_modalities: List[str] = ['flair.nii', 't1.nii', 't1ce.nii', 't2.nii']
-        
-
         # Primero, obtén todos los IDs de pacientes en cada directorio
-        ids_x_temp = set([d for d in os.listdir(images_dir) if os.path.isdir(os.path.join(images_dir, d))])
-        ids_y_temp = set([d for d in os.listdir(masks_dir) if os.path.isdir(os.path.join(masks_dir, d))])
-        
+        try:
+            ids_x_temp = set([d for d in os.listdir(images_dir) if os.path.isdir(os.path.join(images_dir, d))])
+            ids_y_temp = set([d for d in os.listdir(masks_dir) if os.path.isdir(os.path.join(masks_dir, d))])
+        except FileNotFoundError as e:
+            raise RuntimeError(f"Directorio no encontrado: {e.filename}") from e
+        except Exception as e:
+            raise RuntimeError(f"Error al listar directorios: {str(e)}") from e
+
         # Encuentra los IDs que están en AMBOS directorios
         common_ids = sorted(list(ids_x_temp.intersection(ids_y_temp)))
-        
-        # Filtra la lista común para asegurarte de que cada carpeta tiene los archivos necesarios
-        self.ids: List[str] = [
-            d for d in common_ids
-            if any(f.lower().endswith(tuple(valid_modalities)) for f in os.listdir(os.path.join(images_dir, d))) and
-               any(f.lower().endswith('seg.nii.gz') for f in os.listdir(os.path.join(masks_dir, d)))
-        ]
+        if not common_ids:
+            raise RuntimeError("No se encontraron IDs comunes entre los directorios de imágenes y máscaras.")
 
-        # self.ids_x: List[str] = sorted([
-        #     d for d in os.listdir(images_dir)
-        #     if os.path.isdir(os.path.join(images_dir, d)) and
-        #        any(f.lower().endswith(tuple(valid_modalities)) for f in os.listdir(os.path.join(images_dir, d)))
-        # ])
-        
-        # self.ids_y: List[str] = sorted([
-        #     d for d in os.listdir(masks_dir)
-        #     if os.path.isdir(os.path.join(masks_dir, d)) and
-        #        any(f.lower().endswith('seg.nii') for f in os.listdir(os.path.join(masks_dir, d)))
-        # ])
+        # Filtra la lista común para asegurarte de que cada carpeta tiene los archivos necesarios
+        self.ids: List[str] = []
+        for d in common_ids:
+            try:
+                imgs = os.listdir(os.path.join(images_dir, d))
+                msks = os.listdir(os.path.join(masks_dir, d))
+            except Exception as e:
+                print(f"Advertencia: No se pudo acceder a la carpeta {d}: {e}")
+                continue
+            if any(f.lower().endswith(tuple(valid_modalities)) for f in imgs) and \
+               any(f.lower().endswith('seg.nii.gz') for f in msks):
+                self.ids.append(d)
 
         self.images_fps: List[str] = [os.path.join(images_dir, image_id) for image_id in self.ids]
         self.masks_fps: List[str] = [os.path.join(masks_dir, image_id) for image_id in self.ids]
@@ -125,3 +123,37 @@ class Dataset(BaseDataset):
         mask_tensor = torch.from_numpy(mask2).long()
         
         return image_tensor, mask_tensor
+
+# Código de prueba
+if __name__ == "__main__":
+    # Usa la ruta relativa desde la raíz del proyecto
+    data_base_path = 'data/processed'
+
+    # Usa os.path.join para construir rutas de forma segura
+    images_dir = os.path.join(data_base_path, 'X_train')
+    masks_dir = os.path.join(data_base_path, 'y_train')
+    
+    classes = ['background', 'NCR', 'ED', 'ET']
+
+    dataset = Dataset(images_dir, masks_dir, classes)
+
+    try:
+        img, msk = dataset[0]
+        print(f"Total de muestras: {len(dataset)}")
+        print(f"Tipo de dato de la imagen: {img.dtype}")
+        print(f"Tipo de dato de la máscara: {msk.dtype}")
+        print(f"Shape imagen: {img.shape}")
+        print(f"Shape máscara: {msk.shape}")
+        # Muestra los valores de píxeles de una sección de la imagen
+        print("\nValores de píxeles de la imagen (slice 64, canal 0):")
+        print(img[0, 64, 64:70, 64:70])
+
+        print(f"Valores de la imagen (min/max): {img.min().item()} / {img.max().item()}")
+
+        # Muestra los valores únicos y el conteo de etiquetas en la máscara
+        unique, counts = np.unique(msk.numpy(), return_counts=True)
+        label_counts = dict(zip(unique, counts))
+        print("\nValores únicos y conteo en la máscara:")
+        print(label_counts)
+    except Exception as e:
+        print(f"Error al cargar la muestra: {e}")
