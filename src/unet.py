@@ -3,33 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple
 from torchinfo import summary
-
-class DoubleConv(nn.Module):
-    """
-    Bloque de doble convolución 3D.
-
-    Este módulo aplica dos convoluciones 3D consecutivas, cada una seguida de una 
-    normalización por lotes (`BatchNorm3d`) y una función de activación ReLU. 
-    Mantiene la resolución espacial (D, H, W) del tensor de entrada. El uso de 
-    `bias=False` es una buena práctica cuando se utiliza `BatchNorm` para evitar 
-    parámetros redundantes.
-
-    Args:
-        in_channels (int): Número de canales de entrada.
-        out_channels (int): Número de canales de salida.
-    """
-    def __init__(self, in_channels: int, out_channels: int):
-        super(DoubleConv, self).__init__()
-        self.conv = nn.Sequential(
-            nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm3d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm3d(out_channels),
-            nn.ReLU(inplace=True)
-        )
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.conv(x)
+from convs import DoubleConv
 
 class EncoderBlock(nn.Module):
     """
@@ -54,7 +28,7 @@ class EncoderBlock(nn.Module):
         pool_out = self.maxpool(conv_out)
         return conv_out, pool_out
 
-class UNetEncoder(nn.Module):
+class Encoder(nn.Module):
     """
     Ruta de contracción (encoder) para la arquitectura UNet 3D.
 
@@ -63,7 +37,7 @@ class UNetEncoder(nn.Module):
     características de bajo nivel y semánticas.
     """
     def __init__(self, in_channels: int, base_channels: int = 64):
-        super(UNetEncoder, self).__init__()
+        super(Encoder, self).__init__()
         # Los canales se escalan en cada etapa
         self.enc_block1 = EncoderBlock(in_channels, base_channels)
         self.enc_block2 = EncoderBlock(base_channels, base_channels * 2)
@@ -111,7 +85,7 @@ class UpConvBlock(nn.Module):
         x_combined = torch.cat([x_skip, x_up], dim=1)
         return self.double_conv(x_combined)
 
-class UNetDecoder(nn.Module):
+class Decoder(nn.Module):
     """
     Ruta de expansión (decoder) para la arquitectura UNet 3D.
 
@@ -120,7 +94,7 @@ class UNetDecoder(nn.Module):
     semánticas de baja resolución del cuello de botella.
     """
     def __init__(self, base_channels: int):
-        super(UNetDecoder, self).__init__()
+        super(Decoder, self).__init__()
         self.up_block1 = UpConvBlock(in_channels_up=base_channels * 16, skip_channels=base_channels * 8, out_channels=base_channels * 8)
         self.up_block2 = UpConvBlock(in_channels_up=base_channels * 8, skip_channels=base_channels * 4, out_channels=base_channels * 4)
         self.up_block3 = UpConvBlock(in_channels_up=base_channels * 4, skip_channels=base_channels * 2, out_channels=base_channels * 2)
@@ -150,8 +124,8 @@ class UNet(nn.Module):
     """
     def __init__(self,  in_channels: int = 1, num_classes: int = 2, base_channels: int = 64):
         super(UNet, self).__init__()
-        self.encoder = UNetEncoder(in_channels, base_channels)
-        self.decoder = UNetDecoder(base_channels)
+        self.encoder = Encoder(in_channels, base_channels)
+        self.decoder = Decoder(base_channels)
         self.out_conv = nn.Conv3d(base_channels, num_classes, kernel_size=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

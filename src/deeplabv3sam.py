@@ -3,90 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple
 from torchinfo import summary
+
 from sam import SAM
-from deeplabv3 import BackboneXception
-
-
-class ASPP(nn.Module):
-    """
-    Módulo Atrous Spatial Pyramid Pooling (ASPP) con atención SAM en cada rama.
-    """
-    def __init__(self, in_channels, out_channels, atrous_rates=[1, 2, 4, 6]):
-        """
-        Inicializa el módulo ASPP.
-
-        Args:
-            in_channels (int): Número de canales de entrada.
-            out_channels (int): Número de canales de salida.
-            atrous_rates (list[int]): Tasas de atrous para las convoluciones.
-        """
-        super(ASPP, self).__init__()
-        # Se crean cinco instancias de SAM, una para cada rama del ASPP
-        self.sam1 = SAM(in_channels=out_channels)
-        self.sam2 = SAM(in_channels=out_channels)
-        self.sam3 = SAM(in_channels=out_channels)
-        self.sam4 = SAM(in_channels=out_channels)
-        self.sam5 = SAM(in_channels=out_channels)
-        
-        self.conv1 = nn.Sequential(
-            nn.Conv3d(in_channels, out_channels, kernel_size=1, bias=False),
-            nn.BatchNorm3d(out_channels),
-            nn.ReLU(inplace=True)
-        )
-        self.conv3_2 = nn.Sequential(
-            nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=atrous_rates[1],
-                      dilation=atrous_rates[1], bias=False),
-            nn.BatchNorm3d(out_channels),
-            nn.ReLU(inplace=True)
-        )
-        self.conv3_4 = nn.Sequential(
-            nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=atrous_rates[2],
-                      dilation=atrous_rates[2], bias=False),
-            nn.BatchNorm3d(out_channels),
-            nn.ReLU(inplace=True)
-        )
-        self.conv3_6 = nn.Sequential(
-            nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=atrous_rates[3],
-                      dilation=atrous_rates[3], bias=False),
-            nn.BatchNorm3d(out_channels),
-            nn.ReLU(inplace=True)
-        )
-        self.global_pool = nn.Sequential(
-            nn.AdaptiveAvgPool3d((2, 2, 2)),
-            nn.Conv3d(in_channels, out_channels, kernel_size=1, bias=False),
-            nn.BatchNorm3d(out_channels),
-            nn.ReLU(inplace=True)
-        )
-        self.project = nn.Sequential(
-            nn.Conv3d(out_channels * 5, out_channels, kernel_size=1, bias=False),
-            nn.BatchNorm3d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Dropout3d(0.5)
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Aplica el módulo ASPP a la entrada.
-
-        Args:
-            x (torch.Tensor): Tensor de entrada.
-
-        Returns:
-            torch.Tensor: Tensor de salida del ASPP.
-        """
-        # Aplicamos SAM a cada una de las 5 ramas de ASPP
-        x1 = self.sam1(self.conv1(x))
-        x2 = self.sam2(self.conv3_2(x))
-        x3 = self.sam3(self.conv3_4(x))
-        x4 = self.sam4(self.conv3_6(x))
-        
-        x5 = self.global_pool(x)
-        x5 = self.sam5(x5)
-        x5 = F.interpolate(x5, size=x.shape[2:], mode='trilinear', align_corners=False)
-        
-        x = torch.cat([x1, x2, x3, x4, x5], dim=1)
-        x = self.project(x)
-        return x
+from backbone import BackboneXception
+from pooling import ASPP
 
 
 class Encoder(nn.Module):
@@ -103,7 +23,7 @@ class Encoder(nn.Module):
         """
         super(Encoder, self).__init__()
         self.backbone = BackboneXception(in_channels=in_channels)
-        self.aspp = ASPP(in_channels=2048, out_channels=out_channels)
+        self.aspp = ASPP(in_channels=2048, out_channels=out_channels, use_sam=True)
         
         # Módulo de convolución 1x1x1 y atención SAM para la rama del backbone
         self.backbone_branch_conv = nn.Conv3d(in_channels=2048, out_channels=256, kernel_size=1)

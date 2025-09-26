@@ -9,7 +9,7 @@ from torch.optim import Adam, SGD
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-import clcu_net
+import clcunet
 import dataset
 import deeplabv3
 import deeplabv3sam
@@ -44,7 +44,7 @@ def get_model(config: Dict[str, Any]) -> torch.nn.Module:
     elif model_name == "DeepLabV3+SAM":
         return deeplabv3sam.DeepLabV3PlusSAM(**model_params)
     elif model_name == "CLCUNet":
-        return clcu_net.CLCUNet(**model_params)
+        return clcunet.CLCUNet(**model_params)
     else:
         raise ValueError(f"Modelo no soportado: {model_name}")
     
@@ -83,9 +83,22 @@ def main(config_path: str):
     # Instanciación dinámica de optimizador y pérdida
     optimizer_class = OPTIMIZERS[config['training']['optimizer']]
     optimizer = optimizer_class(model.parameters(), lr=config['training']['learning_rate'])
+
+    loss_name = config['training']['loss']
+
+    if loss_name == "DiceLoss" and config['model']['name'] == "CLCUNet":
+        # Solo CLCUNet usa DiceLoss con sigmoid
+        loss = DiceLoss(activation="sigmoid")
+    else:
+        loss_class = LOSSES[loss_name]
+        loss = loss_class()
+
+    # # Instanciación dinámica de optimizador y pérdida
+    # optimizer_class = OPTIMIZERS[config['training']['optimizer']]
+    # optimizer = optimizer_class(model.parameters(), lr=config['training']['learning_rate'])
     
-    loss_class = LOSSES[config['training']['loss']]
-    loss = loss_class()
+    # loss_class = LOSSES[config['training']['loss']]
+    # loss = loss_class()
 
     print(f"Iniciando el entrenamiento del modelo: {config['model']['name']}")
 
