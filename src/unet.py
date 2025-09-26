@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple
-
+from torchinfo import summary
 
 class DoubleConv(nn.Module):
     """
@@ -166,3 +166,8 @@ class UNet(nn.Module):
         return output
   
 
+if __name__ == "__main__":
+    # Prueba rápida del modelo UNet
+    input_size = (1, 4, 128, 128, 128) 
+    model = UNet(in_channels=4, num_classes=4)  
+    summary(model, input_size=input_size, col_names=["input_size", "output_size", "num_params"], depth=5)

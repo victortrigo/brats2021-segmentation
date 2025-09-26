@@ -1,19 +1,21 @@
-import sys
-import yaml
-import torch
-from torch.utils.data import DataLoader
-from tqdm import tqdm
-from typing import Dict, Any
 import os
 from datetime import datetime
+from typing import Any, Dict
 
-from . import dataset, train, metrics, unet, deeplabv3, deeplabv3sam, clcu_net
+import torch
+import yaml
 from torch.nn import BCEWithLogitsLoss
 from torch.optim import Adam, SGD
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from .train import TrainEpoch, ValidEpoch
-from .metrics import DiceLoss, JaccardLoss, IoU, Accuracy, Fscore, Recall, Precision
+import clcu_net
+import dataset
+import deeplabv3
+import deeplabv3sam
+import unet
+from metrics import Accuracy, DiceLoss, Fscore, IoU, JaccardLoss, Precision, Recall
+from train import TrainEpoch, ValidEpoch
 
 # Definición del dispositivo para el entrenamiento
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

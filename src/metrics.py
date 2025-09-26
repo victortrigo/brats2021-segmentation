@@ -1,5 +1,5 @@
 import re
-from typing import Optional, List, Tuple, Union, Callable
+from typing import Optional, List, Union, Callable
 import torch
 import torch.nn as nn
 

@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Tuple, Type
-
+from typing import Tuple
+from torchinfo import summary
 
 class SeparableConv(nn.Module):
     """
@@ -274,3 +274,10 @@ class DeepLabV3Plus(nn.Module):
         low_level, aspp_output = self.encoder(x)
         output = self.decoder(aspp_output, low_level)
         return output
+
+
+if __name__ == "__main__":
+    # Prueba rápida del modelo DeepLabV3+
+    input_size = (1, 4, 128, 128, 128)  # Ejemplo con un batch size de 1 y una sola modalidad
+    model = DeepLabV3Plus(in_channels=4, num_classes=4)  # Ejemplo para segmentación en 3 clases
+    summary(model, input_size=input_size, col_names=["input_size", "output_size", "num_params"], depth=5)

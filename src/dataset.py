@@ -73,7 +73,7 @@ class Dataset(BaseDataset):
         """
         return len(self.ids)
 
-    def __getitem__(self, i: int) -> Tuple[np.ndarray, np.ndarray]:
+    def __getitem__(self, i: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Carga y devuelve una muestra del dataset en el índice `i`.
 
@@ -124,36 +124,45 @@ class Dataset(BaseDataset):
         
         return image_tensor, mask_tensor
 
-# Código de prueba
-if __name__ == "__main__":
-    # Usa la ruta relativa desde la raíz del proyecto
-    data_base_path = 'data/processed'
 
-    # Usa os.path.join para construir rutas de forma segura
-    images_dir = os.path.join(data_base_path, 'X_train')
-    masks_dir = os.path.join(data_base_path, 'y_train')
-    
+if __name__ == "__main__":
+    from pprint import pprint
+
+    data_base_path = 'data/processed'
     classes = ['background', 'NCR', 'ED', 'ET']
 
-    dataset = Dataset(images_dir, masks_dir, classes)
+    subsets = ['train', 'val', 'test']
+    sizes = {}
 
-    try:
+    for subset in subsets:
+        images_dir = os.path.join(data_base_path, f'X_{subset}')
+        masks_dir = os.path.join(data_base_path, f'y_{subset}')
+        if os.path.exists(images_dir) and os.path.exists(masks_dir):
+            dataset = Dataset(images_dir, masks_dir, classes)
+            sizes[subset] = len(dataset)
+        else:
+            sizes[subset] = 0
+
+    print("-" * 40)
+    print("Tamaños de los subconjuntos:")
+    for subset in subsets:
+        print(f"{subset.capitalize()}: {sizes[subset]} muestras")
+    print("-" * 40)
+
+    # Ejemplo de inspección de una muestra del train
+    if sizes['train'] > 0:
+        dataset = Dataset(
+            os.path.join(data_base_path, 'X_train'),
+            os.path.join(data_base_path, 'y_train'),
+            classes
+        )
         img, msk = dataset[0]
-        print(f"Total de muestras: {len(dataset)}")
-        print(f"Tipo de dato de la imagen: {img.dtype}")
-        print(f"Tipo de dato de la máscara: {msk.dtype}")
-        print(f"Shape imagen: {img.shape}")
-        print(f"Shape máscara: {msk.shape}")
-        # Muestra los valores de píxeles de una sección de la imagen
-        print("\nValores de píxeles de la imagen (slice 64, canal 0):")
-        print(img[0, 64, 64:70, 64:70])
-
-        print(f"Valores de la imagen (min/max): {img.min().item()} / {img.max().item()}")
-
-        # Muestra los valores únicos y el conteo de etiquetas en la máscara
+        print(f"Imagen: dtype={img.dtype}, shape={tuple(img.shape)}, min={img.min().item():.2f}, max={img.max().item():.2f}")
+        print(f"Máscara: dtype={msk.dtype}, shape={tuple(msk.shape)}")
         unique, counts = np.unique(msk.numpy(), return_counts=True)
         label_counts = dict(zip(unique, counts))
-        print("\nValores únicos y conteo en la máscara:")
-        print(label_counts)
-    except Exception as e:
-        print(f"Error al cargar la muestra: {e}")
+        print("Conteo de etiquetas en la máscara:")
+        # pprint(label_counts)
+        for val, count in zip(unique, counts):
+            class_name = classes[int(val)] if int(val) < len(classes) else "desconocido"
+            print(f"  Clase {val} ({class_name}): {count} voxels")
