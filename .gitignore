@@ -1,29 +1,29 @@
-# Ignora todo el contenido de la carpeta processed
-/data/processed/
-
-# Pero NO ignores los archivos .dvc
-!/data/processed/.dvc
-
-
-models/
-# *.nii
-# *.nii.gz
-
-# Archivos de cache
-# .dvc/cache/
-__pycache__/
-
-# Logs de entrenamiento y resultados
-logs/
-reports/
-
-# Modelos binarios de PyTorch
-*.pt
-*.pth
-
+# ----------------------------------------
+# DEPENDENCIAS
+# ----------------------------------------
 # Entornos virtuales
 .venv/
 venv/
 env/
-/models
-/reports
+
+# Cache de Python
+__pycache__/
+# *.pyc
+# *.pyd
+
+# ----------------------------------------
+# SALIDAS Y LOGS (Ignoramos todo lo que genera el entrenamiento)
+# ----------------------------------------
+logs/
+reports/
+models/
+*.pt
+*.pth
+# *.onnx
+
+# ----------------------------------------
+# DATOS
+# ----------------------------------------
+# Mantenemos esta línea, asumiendo que los archivos procesados NO deben subir a Git.
+/data/processed/
+
