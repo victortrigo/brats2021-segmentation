@@ -9,7 +9,7 @@ dependencies:
   - pytorch
   - torchvision
   - torchaudio
-  - cudatoolkit=11.8 # Importante: Esta versión puede variar dependiendo de la GPU del computador de producción.
+  - cudatoolkit=11.8 # Importante: ¡Verifica la versión de CUDA!
   - numpy
   - nibabel
   - matplotlib

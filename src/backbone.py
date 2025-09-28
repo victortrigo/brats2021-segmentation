@@ -147,7 +147,50 @@ class ExitFlow(nn.Module):
 
         # Progresiva expansión de canales
         self.sepconv1 = SeparableConv(1024, 1536, stride=1)
-        self.sepconv2 = SeparableConv(1536, 1536, stride=1)
+        self.sepconv2 = SeparableConv(1536, 1536, stride=1) 
+        self.sepconv3 = SeparableConv(1536, 2048, stride=1)
+
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x (torch.Tensor): Entrada del flujo intermedio.
+
+        Returns:
+            torch.Tensor: Características de alto nivel con 2048 canales.
+        """
+        residual = self.residual(x)
+        x = self.block(x) + residual
+        x = self.relu(x)
+
+        x = self.sepconv1(x)
+        x = self.sepconv2(x)
+        x = self.sepconv3(x)
+        return x
+    
+    
+class ExitFlow_8(nn.Module):
+    """
+    Exit Flow del backbone Xception 3D.
+    - Extrae características de alto nivel para la etapa de clasificación o decodificación.
+    """
+    def __init__(self):
+        super(ExitFlow_8, self).__init__()
+        # Bloque inicial con residual connection
+        self.block = nn.Sequential(
+            SeparableConv(728, 1024, stride=1),
+            SeparableConv(1024, 1024, stride=1),
+            SeparableConv(1024, 1024, stride=2) # Cambio
+        )
+        self.residual = nn.Sequential(
+            nn.Conv3d(728, 1024, kernel_size=1, stride=2, bias=False), # Cambio
+            nn.BatchNorm3d(1024)
+        )
+
+        # Progresiva expansión de canales
+        self.sepconv1 = SeparableConv(1024, 1536, stride=1)
+        self.sepconv2 = SeparableConv(1536, 1536, stride=2) # Cambio
         self.sepconv3 = SeparableConv(1536, 2048, stride=1)
 
         self.relu = nn.ReLU(inplace=True)
@@ -180,7 +223,7 @@ class BackboneXception(nn.Module):
         super(BackboneXception, self).__init__()
         self.entry = EntryFlow(in_channels)
         self.middle = MiddleFlow()
-        self.exit = ExitFlow()
+        self.exit = ExitFlow_8()
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
