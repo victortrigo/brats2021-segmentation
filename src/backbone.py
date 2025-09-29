@@ -132,65 +132,26 @@ class ExitFlow(nn.Module):
     Exit Flow del backbone Xception 3D.
     - Extrae características de alto nivel para la etapa de clasificación o decodificación.
     """
-    def __init__(self):
+    def __init__(self, output_stride: int = 16):
         super(ExitFlow, self).__init__()
+        
+        sepconv2_stride = 2 if output_stride == 32 else 1
+
+
         # Bloque inicial con residual connection
         self.block = nn.Sequential(
             SeparableConv(728, 1024, stride=1),
             SeparableConv(1024, 1024, stride=1),
-            SeparableConv(1024, 1024, stride=1)
+            SeparableConv(1024, 1024, stride=2) 
         )
         self.residual = nn.Sequential(
-            nn.Conv3d(728, 1024, kernel_size=1, stride=1, bias=False),
+            nn.Conv3d(728, 1024, kernel_size=1, stride=2, bias=False), 
             nn.BatchNorm3d(1024)
         )
 
         # Progresiva expansión de canales
         self.sepconv1 = SeparableConv(1024, 1536, stride=1)
-        self.sepconv2 = SeparableConv(1536, 1536, stride=1) 
-        self.sepconv3 = SeparableConv(1536, 2048, stride=1)
-
-        self.relu = nn.ReLU(inplace=True)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            x (torch.Tensor): Entrada del flujo intermedio.
-
-        Returns:
-            torch.Tensor: Características de alto nivel con 2048 canales.
-        """
-        residual = self.residual(x)
-        x = self.block(x) + residual
-        x = self.relu(x)
-
-        x = self.sepconv1(x)
-        x = self.sepconv2(x)
-        x = self.sepconv3(x)
-        return x
-    
-    
-class ExitFlow_8(nn.Module):
-    """
-    Exit Flow del backbone Xception 3D.
-    - Extrae características de alto nivel para la etapa de clasificación o decodificación.
-    """
-    def __init__(self):
-        super(ExitFlow_8, self).__init__()
-        # Bloque inicial con residual connection
-        self.block = nn.Sequential(
-            SeparableConv(728, 1024, stride=1),
-            SeparableConv(1024, 1024, stride=1),
-            SeparableConv(1024, 1024, stride=2) # Cambio
-        )
-        self.residual = nn.Sequential(
-            nn.Conv3d(728, 1024, kernel_size=1, stride=2, bias=False), # Cambio
-            nn.BatchNorm3d(1024)
-        )
-
-        # Progresiva expansión de canales
-        self.sepconv1 = SeparableConv(1024, 1536, stride=1)
-        self.sepconv2 = SeparableConv(1536, 1536, stride=2) # Cambio
+        self.sepconv2 = SeparableConv(1536, 1536, stride=sepconv2_stride) 
         self.sepconv3 = SeparableConv(1536, 2048, stride=1)
 
         self.relu = nn.ReLU(inplace=True)
@@ -219,11 +180,23 @@ class BackboneXception(nn.Module):
     - Compuesto por EntryFlow, MiddleFlow y ExitFlow.
     - Inspirado en la arquitectura Xception para imágenes 3D.
     """
-    def __init__(self, in_channels: int = 4):
+    def __init__(self, 
+                 in_channels: int = 4, 
+                 output_stride: int = 16,
+                 num_middle_blocks: int = 16):
         super(BackboneXception, self).__init__()
+
+        # Validación estricta: Solo se permiten 16 o 32
+        ALLOWED_STRIDES = {16, 32}
+        if output_stride not in ALLOWED_STRIDES:
+            raise ValueError(
+                f"Output Stride '{output_stride}' no es compatible para el backbone Xception 3D. "
+                f"Solo se permiten: {ALLOWED_STRIDES}."
+            )
+        
         self.entry = EntryFlow(in_channels)
-        self.middle = MiddleFlow()
-        self.exit = ExitFlow_8()
+        self.middle = MiddleFlow(num_blocks=num_middle_blocks)
+        self.exit = ExitFlow(output_stride=output_stride)
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -238,7 +211,7 @@ class BackboneXception(nn.Module):
         x = self.middle(x)
         high_level = self.exit(x)
         return low_level, high_level
-    
+
 
 if __name__ == "__main__":
     """
@@ -249,10 +222,18 @@ if __name__ == "__main__":
             low_level (torch.Tensor): Características de bajo nivel (para skip connections).
             high_level (torch.Tensor): Características de alto nivel (para el decoder o clasificador).
         """
-    model = BackboneXception(in_channels=4)
+    model = BackboneXception(in_channels=4, output_stride=16)
     summary(
         model, 
         input_size=(1, 4, 128, 128, 128), 
         col_names=["input_size", "output_size", "num_params"], 
-        depth=5
+        depth=2
+    )
+
+    model = BackboneXception(in_channels=4, output_stride=32)
+    summary(
+        model, 
+        input_size=(1, 4, 128, 128, 128), 
+        col_names=["input_size", "output_size", "num_params"], 
+        depth=4
     )
