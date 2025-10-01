@@ -14,7 +14,7 @@ class EntryFlow(nn.Module):
     - Introduce bloques residuales con convoluciones separables en 3D.
     """
     def __init__(self, in_channels: int):
-        super(EntryFlow, self).__init__()
+        super().__init__()
         # Primer bloque de reducción inicial
         self.conv1 = nn.Sequential(
             nn.Conv3d(in_channels, 32, kernel_size=3, stride=2, padding=1, bias=False),
@@ -101,7 +101,7 @@ class MiddleFlow(nn.Module):
     - Mantiene dimensionalidad, profundizando la representación.
     """
     def __init__(self, num_blocks: int = 16):
-        super(MiddleFlow, self).__init__()
+        super().__init__()
         self.blocks = nn.ModuleList([self._make_block() for _ in range(num_blocks)])
 
     def _make_block(self):
@@ -133,7 +133,7 @@ class ExitFlow(nn.Module):
     - Extrae características de alto nivel para la etapa de clasificación o decodificación.
     """
     def __init__(self, output_stride: int = 16):
-        super(ExitFlow, self).__init__()
+        super().__init__()
         
         sepconv2_stride = 2 if output_stride == 32 else 1
 
@@ -184,7 +184,7 @@ class BackboneXception(nn.Module):
                  in_channels: int = 4, 
                  output_stride: int = 16,
                  num_middle_blocks: int = 16):
-        super(BackboneXception, self).__init__()
+        super().__init__()
 
         # Validación estricta: Solo se permiten 16 o 32
         ALLOWED_STRIDES = {16, 32}
@@ -213,27 +213,22 @@ class BackboneXception(nn.Module):
         return low_level, high_level
 
 
+
 if __name__ == "__main__":
     """
-        Args:
-            x (torch.Tensor): Entrada (B, C, D, H, W).
+    Args:
+        x (torch.Tensor): Entrada (B, C, D, H, W).
 
-        Returns:
-            low_level (torch.Tensor): Características de bajo nivel (para skip connections).
-            high_level (torch.Tensor): Características de alto nivel (para el decoder o clasificador).
-        """
-    model = BackboneXception(in_channels=4, output_stride=16)
-    summary(
-        model, 
-        input_size=(1, 4, 128, 128, 128), 
-        col_names=["input_size", "output_size", "num_params"], 
-        depth=2
-    )
-
-    model = BackboneXception(in_channels=4, output_stride=32)
-    summary(
-        model, 
-        input_size=(1, 4, 128, 128, 128), 
-        col_names=["input_size", "output_size", "num_params"], 
-        depth=4
-    )
+    Returns:
+        low_level (torch.Tensor): Características de bajo nivel (para skip connections).
+        high_level (torch.Tensor): Características de alto nivel (para el decoder o clasificador).
+    """
+    for os in [16, 32]:
+        print(f"\n==== Backbone con output_stride={os} ====\n")
+        model = BackboneXception(in_channels=4, output_stride=os)
+        summary(
+            model,
+            input_size=(1, 4, 128, 128, 128),
+            col_names=["input_size", "output_size", "num_params"],
+            depth=2
+        )

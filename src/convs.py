@@ -15,7 +15,7 @@ class DoubleConv(nn.Module):
         activation (str): 'relu' o 'leakyrelu' (por defecto 'relu').
     """
     def __init__(self, in_channels: int, out_channels: int, activation: str = "relu"):
-        super(DoubleConv, self).__init__()
+        super().__init__()
         if activation.lower() == "leakyrelu":
             act_layer = nn.LeakyReLU(inplace=True)
         else:
@@ -39,7 +39,7 @@ class SeparableConv(nn.Module):
     Consiste en una convolución depthwise y una pointwise.
     """
     def __init__(self, in_channels: int, out_channels: int, kernel_size: int = 3, stride: int = 1, padding: int = 1):
-        super(SeparableConv, self).__init__()
+        super().__init__()
         self.depthwise = nn.Conv3d(in_channels, in_channels, kernel_size, stride,
                                    padding=padding, groups=in_channels, bias=False)
         self.pointwise = nn.Conv3d(in_channels, out_channels, kernel_size=1, bias=False)
@@ -53,11 +53,26 @@ class SeparableConv(nn.Module):
         x = self.relu(x)
         return x
 
-if __name__ == "__main__":
-    model = DoubleConv(in_channels=4, out_channels=64, activation="relu")
-    summary(model, input_size=(1, 4, 128, 128, 128), col_names=["input_size", "output_size", "num_params"], depth=4)
-    model = DoubleConv(in_channels=4, out_channels=64, activation="leakyrelu")
-    summary(model, input_size=(1, 4, 128, 128, 128), col_names=["input_size", "output_size", "num_params"], depth=4)
-    model = SeparableConv(in_channels=4, out_channels=64)
-    summary(model, input_size=(1, 4, 128, 128, 128), col_names=["input_size", "output_size", "num_params"], depth=4)
+# if __name__ == "__main__":
+#     model = DoubleConv(in_channels=4, out_channels=64, activation="relu")
+#     summary(model, input_size=(1, 4, 128, 128, 128), col_names=["input_size", "output_size", "num_params"], depth=4)
+#     model = DoubleConv(in_channels=4, out_channels=64, activation="leakyrelu")
+#     summary(model, input_size=(1, 4, 128, 128, 128), col_names=["input_size", "output_size", "num_params"], depth=4)
+#     model = SeparableConv(in_channels=4, out_channels=64)
+#     summary(model, input_size=(1, 4, 128, 128, 128), col_names=["input_size", "output_size", "num_params"], depth=4)
 
+if __name__ == "__main__":
+    modelos = [
+        ("DoubleConv ReLU", DoubleConv(in_channels=4, out_channels=64, activation="relu")),
+        ("DoubleConv LeakyReLU", DoubleConv(in_channels=4, out_channels=64, activation="leakyrelu")),
+        ("SeparableConv", SeparableConv(in_channels=4, out_channels=64)),
+    ]
+
+    for nombre, model in modelos:
+        print(f"\n==== {nombre} ====\n")
+        summary(
+            model,
+            input_size=(1, 4, 128, 128, 128),
+            col_names=["input_size", "output_size", "num_params"],
+            depth=4
+        )

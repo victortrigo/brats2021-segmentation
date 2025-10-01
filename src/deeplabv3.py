@@ -21,7 +21,7 @@ class Encoder(nn.Module):
             in_channels (int): Número de canales de entrada (ej. 4 para imágenes médicas multicanal).
             out_channels (int): Número de canales de salida tras el ASPP.
         """
-        super(Encoder, self).__init__()
+        super().__init__()
         self.backbone = BackboneXception(in_channels=in_channels)
         self.aspp = ASPP(in_channels=2048, out_channels=out_channels)
 
@@ -51,7 +51,7 @@ class Decoder(nn.Module):
             low_level_in (int): Número de canales en las características de bajo nivel.
             num_classes (int): Número de clases para segmentación.
         """
-        super(Decoder, self).__init__()
+        super().__init__()
         # Proyección de características de bajo nivel a 48 canales
         self.conv_low = nn.Sequential(
             nn.Conv3d(low_level_in, 48, kernel_size=1, bias=False),
@@ -115,7 +115,7 @@ class DeepLabV3Plus(nn.Module):
             in_channels (int): Número de canales de entrada.
             num_classes (int): Número de clases de salida.
         """
-        super(DeepLabV3Plus, self).__init__()
+        super().__init__()
         self.encoder = Encoder(in_channels=in_channels)
         self.decoder = Decoder(low_level_in=128, num_classes=num_classes)
 
@@ -138,5 +138,5 @@ if __name__ == "__main__":
         model, 
         input_size=(1, 4, 128, 128, 128), 
         col_names=["input_size", "output_size", "num_params"], 
-        depth=5
+        depth=4
     )

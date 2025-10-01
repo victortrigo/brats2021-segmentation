@@ -90,7 +90,11 @@ class SAM(nn.Module):
     
 if __name__ == "__main__":
     # Prueba rápida del módulo SAM
-    input_size = (1, 64, 128, 128, 128)
     sam = SAM(in_channels=64)
-    summary(sam, input_size=input_size, col_names=["input_size", "output_size", "num_params"], depth=5)
+    summary(
+        sam, 
+        input_size=(1, 64, 128, 128, 128), 
+        col_names=["input_size", "output_size", "num_params"], 
+        depth=5
+    )
 

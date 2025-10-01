@@ -126,8 +126,7 @@ class Dataset(BaseDataset):
 
 
 if __name__ == "__main__":
-    from pprint import pprint
-
+    # Verifica los tamaños de los subconjuntos y muestra estadísticas de una muestra
     data_base_path = 'data/processed'
     classes = ['background', 'NCR', 'ED', 'ET']
 
@@ -162,7 +161,6 @@ if __name__ == "__main__":
         unique, counts = np.unique(msk.numpy(), return_counts=True)
         label_counts = dict(zip(unique, counts))
         print("Conteo de etiquetas en la máscara:")
-        # pprint(label_counts)
         for val, count in zip(unique, counts):
             class_name = classes[int(val)] if int(val) < len(classes) else "desconocido"
             print(f"  Clase {val} ({class_name}): {count} voxels")

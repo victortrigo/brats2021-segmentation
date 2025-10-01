@@ -13,7 +13,7 @@ class SPP(nn.Module):
     realiza un upsampling a la resolución original y concatena las características.
     """
     def __init__(self, in_channels: int, out_channels: int, pool_sizes: List[int] = [2, 4, 8]):
-        super(SPP, self).__init__()
+        super().__init__()
         self.pool_layers = nn.ModuleList([
             nn.Sequential(
                 nn.AdaptiveAvgPool3d(output_size=ps),
@@ -55,7 +55,7 @@ class ASPP(nn.Module):
     Módulo Atrous Spatial Pyramid Pooling (ASPP), opcionalmente con atención SAM en cada rama.
     """
     def __init__(self, in_channels, out_channels, atrous_rates=[1, 2, 4, 6], use_sam=False):
-        super(ASPP, self).__init__()
+        super().__init__()
         self.use_sam = use_sam
 
         self.conv1 = nn.Sequential(
@@ -122,10 +122,18 @@ class ASPP(nn.Module):
     
 
 if __name__ == "__main__":
-    model = SPP(in_channels=256, out_channels=256)
-    summary(model, input_size=(1, 256, 16, 16, 16), col_names=["input_size", "output_size", "num_params"], depth=4)
-    model = ASPP(in_channels=256, out_channels=256)
-    summary(model, input_size=(1, 256, 16, 16, 16), col_names=["input_size", "output_size", "num_params"], depth=4)
-    model = ASPP(in_channels=256, out_channels=256, use_sam=True)
-    summary(model, input_size=(1, 256, 16, 16, 16), col_names=["input_size", "output_size", "num_params"], depth=4)
-    
+    modelos = [
+        ("SPP", SPP(in_channels=256, out_channels=256)),
+        ("ASPP", ASPP(in_channels=256, out_channels=256)),
+        ("ASPP + SAM", ASPP(in_channels=256, out_channels=256, use_sam=True)),
+    ]
+
+    for nombre, model in modelos:
+        print(f"\n==== {nombre} ====\n")
+        summary(
+            model,
+            input_size=(1, 256, 16, 16, 16),
+            col_names=["input_size", "output_size", "num_params"],
+            depth=3
+        )
+

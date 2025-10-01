@@ -21,7 +21,7 @@ class Encoder(nn.Module):
             in_channels (int): Número de canales de entrada.
             out_channels (int): Número de canales de salida.
         """
-        super(Encoder, self).__init__()
+        super().__init__()
         self.backbone = BackboneXception(in_channels=in_channels)
         self.aspp = ASPP(in_channels=2048, out_channels=out_channels, use_sam=True)
         
@@ -66,7 +66,7 @@ class Decoder(nn.Module):
             low_level_in (int): Número de canales de las características de bajo nivel.
             num_classes (int): Número de clases para la segmentación.
         """
-        super(Decoder, self).__init__()
+        super().__init__()
         self.sam_low_level = SAM(in_channels=low_level_in)
         
         self.conv_low = nn.Sequential(
@@ -120,7 +120,7 @@ class DeepLabV3PlusSAM(nn.Module):
             in_channels (int): Número de canales del tensor de entrada.
             num_classes (int): Número de clases para la segmentación.
         """
-        super(DeepLabV3PlusSAM, self).__init__()
+        super().__init__()
         self.encoder = Encoder(in_channels=in_channels)
         self.decoder = Decoder(low_level_in=128, num_classes=num_classes)
 
@@ -140,6 +140,10 @@ class DeepLabV3PlusSAM(nn.Module):
 
 if __name__ == "__main__":
     # Prueba rápida del modelo DeepLabV3+
-    input_size = (1, 4, 128, 128, 128)  # Ejemplo con un batch size de 1 y una sola modalidad
     model = DeepLabV3PlusSAM(in_channels=4, num_classes=4)  # Ejemplo para segmentación en 3 clases
-    summary(model, input_size=input_size, col_names=["input_size", "output_size", "num_params"], depth=5)
+    summary(
+        model, 
+        input_size=(1, 4, 128, 128, 128), 
+        col_names=["input_size", "output_size", "num_params"], 
+        depth=4
+    )

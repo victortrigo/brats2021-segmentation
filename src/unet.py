@@ -19,7 +19,7 @@ class EncoderBlock(nn.Module):
         out_channels (int): Número de canales de salida después de la doble convolución.
     """
     def __init__(self, in_channels: int, out_channels: int):
-        super(EncoderBlock, self).__init__()
+        super().__init__()
         self.double_conv = DoubleConv(in_channels, out_channels)
         self.maxpool = nn.MaxPool3d(kernel_size=2, stride=2)
 
@@ -37,7 +37,7 @@ class Encoder(nn.Module):
     características de bajo nivel y semánticas.
     """
     def __init__(self, in_channels: int, base_channels: int = 64):
-        super(Encoder, self).__init__()
+        super().__init__()
         # Los canales se escalan en cada etapa
         self.enc_block1 = EncoderBlock(in_channels, base_channels)
         self.enc_block2 = EncoderBlock(base_channels, base_channels * 2)
@@ -68,7 +68,7 @@ class UpConvBlock(nn.Module):
         out_channels (int): Canales de salida después de la doble convolución.
     """
     def __init__(self, in_channels_up: int, skip_channels: int, out_channels: int):
-        super(UpConvBlock, self).__init__()
+        super().__init__()
         self.up_transpose = nn.ConvTranspose3d(in_channels_up, in_channels_up // 2, kernel_size=2, stride=2)
         self.double_conv = DoubleConv(in_channels_up // 2 + skip_channels, out_channels)
 
@@ -94,7 +94,7 @@ class Decoder(nn.Module):
     semánticas de baja resolución del cuello de botella.
     """
     def __init__(self, base_channels: int):
-        super(Decoder, self).__init__()
+        super().__init__()
         self.up_block1 = UpConvBlock(in_channels_up=base_channels * 16, skip_channels=base_channels * 8, out_channels=base_channels * 8)
         self.up_block2 = UpConvBlock(in_channels_up=base_channels * 8, skip_channels=base_channels * 4, out_channels=base_channels * 4)
         self.up_block3 = UpConvBlock(in_channels_up=base_channels * 4, skip_channels=base_channels * 2, out_channels=base_channels * 2)
@@ -123,7 +123,7 @@ class UNet(nn.Module):
                            (e.g., 2 para binario, >2 para multiclase).
     """
     def __init__(self,  in_channels: int = 1, num_classes: int = 2, base_channels: int = 64):
-        super(UNet, self).__init__()
+        super().__init__()
         self.encoder = Encoder(in_channels, base_channels)
         self.decoder = Decoder(base_channels)
         self.out_conv = nn.Conv3d(base_channels, num_classes, kernel_size=1)
@@ -142,6 +142,10 @@ class UNet(nn.Module):
 
 if __name__ == "__main__":
     # Prueba rápida del modelo UNet
-    input_size = (1, 4, 128, 128, 128) 
     model = UNet(in_channels=4, num_classes=4)  
-    summary(model, input_size=input_size, col_names=["input_size", "output_size", "num_params"], depth=5)
+    summary(
+        model, 
+        input_size=(1, 4, 128, 128, 128), 
+        col_names=["input_size", "output_size", "num_params"], 
+        depth=4
+    )
