@@ -4,8 +4,9 @@ from typing import Any, Dict
 
 import torch
 import yaml
-from torch.nn import BCEWithLogitsLoss
-from torch.optim import Adam, SGD
+
+from torch.optim import Adam
+from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -17,20 +18,9 @@ import unet
 from metrics import Accuracy, DiceLoss, Fscore, IoU, JaccardLoss, Precision, Recall
 from train import TrainEpoch, ValidEpoch
 
+
 # Definición del dispositivo para el entrenamiento
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-# Diccionarios de mapeo para optimizadores y funciones de pérdida
-OPTIMIZERS = {
-    "Adam": Adam,
-    "SGD": SGD,
-}
-
-LOSSES = {
-    "DiceLoss": DiceLoss,
-    "BCEWithLogitsLoss": BCEWithLogitsLoss,
-    "JaccardLoss": JaccardLoss,
-}
 
 def get_model(config: Dict[str, Any]) -> torch.nn.Module:
     """Crea y devuelve el modelo basado en la configuración."""
@@ -49,10 +39,12 @@ def get_model(config: Dict[str, Any]) -> torch.nn.Module:
         raise ValueError(f"Modelo no soportado: {model_name}")
     
 
+
 def main(config_path: str):
     """Función principal para el entrenamiento."""
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
+        print(f"Usando dispositivo: {DEVICE}")
 
     # Carga de datos
     DATA_DIR = config['paths']['data_dir']
@@ -80,25 +72,23 @@ def main(config_path: str):
     # Carga del modelo
     model = get_model(config)
 
-    # Instanciación dinámica de optimizador y pérdida
-    optimizer_class = OPTIMIZERS[config['training']['optimizer']]
-    optimizer = optimizer_class(model.parameters(), lr=config['training']['learning_rate'])
+    # Instanciación directa de optimizador (asumiendo Adam)
+    optimizer = Adam(model.parameters(), lr=config['training']['learning_rate'])
+    
+    # Opcional: Instanciación del Learning Rate Scheduler
+    scheduler = StepLR(optimizer, step_size=50, gamma=0.1) # Reduce el LR a 0.1 en la época 50
+    
 
+    # Instanciación de la pérdida con la lógica especial para CLCUNet
     loss_name = config['training']['loss']
 
     if loss_name == "DiceLoss" and config['model']['name'] == "CLCUNet":
         # Solo CLCUNet usa DiceLoss con sigmoid
         loss = DiceLoss(activation="sigmoid")
+    elif loss_name == "JaccardLoss":
+        loss = JaccardLoss()
     else:
-        loss_class = LOSSES[loss_name]
-        loss = loss_class()
-
-    # # Instanciación dinámica de optimizador y pérdida
-    # optimizer_class = OPTIMIZERS[config['training']['optimizer']]
-    # optimizer = optimizer_class(model.parameters(), lr=config['training']['learning_rate'])
-    
-    # loss_class = LOSSES[config['training']['loss']]
-    # loss = loss_class()
+        raise ValueError(f"Pérdida no soportada: {loss_name}")
 
     print(f"Iniciando el entrenamiento del modelo: {config['model']['name']}")
 
@@ -149,9 +139,8 @@ def main(config_path: str):
             torch.save(model.state_dict(), model_path)
             print(f'Modelo guardado en {model_path}')
 
-        if i == 50:
-            optimizer.param_groups[0]['lr'] = 1e-5
-            print('Decrease decoder learning rate to 1e-5!')
+        # Opcional: Llamada al scheduler después de cada época
+        scheduler.step()
 
     writer.close()
 
@@ -162,3 +151,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     main(args.config)
+
