@@ -4,6 +4,7 @@ import nibabel as nib
 import numpy as np
 from typing import List, Optional, Tuple
 from torch.utils.data import Dataset as BaseDataset
+from torch.utils.data import DataLoader, Subset
 
 # Define las clases para la segmentación
 CLASSES = ['background', 'NCR', 'ED', 'ET']
@@ -123,6 +124,36 @@ class Dataset(BaseDataset):
         mask_tensor = torch.from_numpy(mask2).long()
         
         return image_tensor, mask_tensor
+
+
+def create_subset(data: Dataset, subset_size: int, batch_size: int, shuffle: bool = True) -> Tuple[Dataset, DataLoader]:
+    """
+    Crea un DataLoader basado en un subconjunto aleatorio del Dataset.
+    
+    Si subset_size es <= 0, se utiliza el dataset completo para el entrenamiento real.
+    
+    Args:
+        data (Dataset): El objeto Dataset completo (e.g., train_dataset_full).
+        subset_size (int): El número de muestras a incluir en el subconjunto.
+        batch_size (int): Tamaño del lote para el DataLoader.
+        shuffle (bool): Si se debe mezclar el subconjunto (True para train, False para valid/test).
+
+    Returns:
+        Tuple[Dataset, DataLoader]: El objeto Subset y su DataLoader correspondiente.
+    """
+    if subset_size <= 0 or subset_size > len(data):
+        # Si subset_size es 0, usa el dataset completo
+        subset_size = len(data)
+
+    # Selecciona índices aleatorios sin reemplazo
+    indices = np.random.choice(len(data), subset_size, replace=False)
+    # Crea el subconjunto de datos (Subset) usando los índices seleccionados
+    subset = Subset(data, indices)
+    
+    # Crear DataLoader
+    loader = DataLoader(subset, batch_size=batch_size, shuffle=shuffle, num_workers=0)
+    
+    return subset, loader
 
 
 if __name__ == "__main__":

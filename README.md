@@ -33,14 +33,24 @@ Existen 4 archivos de configuración en `configs/`:
 - `clcunet_config.yaml` : U-Net con módulo de atención SAM.
 - `deeplabv3_config.yaml` : DeepLabV3+ estándar.
 - `deeplabv3sam_config.yaml` : DeepLabV3+ con SAM.
+- `config_test.yaml`: Activar el modo de prueba rápida (ej. 50 épocas, subsets 50/5/5)
 
-### Entrenamiento
+### Entrenamiento (dataset completo 999/125/125)
 
 Para entrenar un modelo específico:
 
 ```bash
 python src/training.py --config configs/unet_config.yaml
 ```
+
+### Entrenamiento (dataset de prueba 50/5/5)
+
+Para entrenar un modelo específico:
+
+```bash
+python src/training.py --config configs/deeplabv3_config.yaml --mode configs/config_test.yaml
+```
+
 
 ## Evaluación
 
