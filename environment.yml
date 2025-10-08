@@ -15,7 +15,7 @@ dependencies:
   - matplotlib
   - tqdm
   - opencv
-  - tensorboard
   - pip:
     - segmentation-models-pytorch
     - torchinfo
+    - tensorboard

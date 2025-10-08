@@ -38,17 +38,28 @@ def get_model(config: Dict[str, Any]) -> torch.nn.Module:
         torch.nn.Module: El modelo de segmentación instanciado.
     """
     model_name = config['model']['name']
-    # Extrae todos los parámetros del modelo, excluyendo el nombre
-    model_params = {k: v for k, v in config['model'].items() if k != 'name'}
+
+    # Extrae parámetros universales (si existen) o usa un valor seguro
+    params = config['model']
+    in_channels = params.get('in_channels', 4) 
+    num_classes = params.get('num_classes', 4) 
+    base_channels = params.get('base_channels', 64)
     
     if model_name == "UNet":
-        return unet.UNet(**model_params)
+        # UNet acepta in_channels, num_classes, base_channels
+        return unet.UNet(in_channels=in_channels, num_classes=num_classes, base_channels=base_channels)
+        
     elif model_name == "DeepLabV3+":
-        return deeplabv3.DeepLabV3Plus(**model_params)
+        # DeepLabV3+ y DeepLabV3+SAM solo aceptan in_channels y num_classes
+        return deeplabv3.DeepLabV3Plus(in_channels=in_channels, num_classes=num_classes)
+        
     elif model_name == "DeepLabV3+SAM":
-        return deeplabv3sam.DeepLabV3PlusSAM(**model_params)
+        return deeplabv3sam.DeepLabV3PlusSAM(in_channels=in_channels, num_classes=num_classes)
+        
     elif model_name == "CLCUNet":
-        return clcunet.CLCUNet(**model_params)
+        # CLCUNet acepta in_channels y base_channels
+        return clcunet.CLCUNet(in_channels=in_channels, base_channels=base_channels)
+        
     else:
         raise ValueError(f"Modelo no soportado: {model_name}")
     
@@ -133,14 +144,35 @@ def main(config_path: str, mode_config_path: str = None):
     scheduler = StepLR(optimizer, step_size=50, gamma=0.1) # Reduce el LR a 0.1 en la época 50
     
     loss_name = config['training']['loss']
+    model_name = config['model']['name']
 
-    if loss_name == "DiceLoss" and config['model']['name'] == "CLCUNet":
-        # Lógica de pérdida específica para CLCUNet
-        loss = DiceLoss(activation="sigmoid")
+    if loss_name == "DiceLoss":
+        # Condición específica para CLCUNet, que requiere sigmoid
+        if model_name == "CLCUNet":
+            criterion = DiceLoss(activation="sigmoid")
+            print("Usando DiceLoss con activación 'sigmoid' para CLCUNet.")
+        else:
+            # DiceLoss por defecto para otros modelos (asumiendo que usan softmax o no requieren activación)
+            criterion = DiceLoss()
+            print("Usando DiceLoss por defecto.")
+
     elif loss_name == "JaccardLoss":
-        loss = JaccardLoss()
+        criterion = JaccardLoss()
+        print("Usando JaccardLoss.")
+
     else:
         raise ValueError(f"Pérdida no soportada: {loss_name}")
+
+    # Envuelve la función de pérdida en el dispositivo (CPU/GPU)
+    criterion.to(DEVICE)
+
+    # if loss_name == "DiceLoss" and config['model']['name'] == "CLCUNet":
+    #     # Lógica de pérdida específica para CLCUNet
+    #     loss = DiceLoss(activation="sigmoid")
+    # elif loss_name == "JaccardLoss":
+    #     loss = JaccardLoss()
+    # else:
+    #     raise ValueError(f"Pérdida no soportada: {loss_name}")
 
     print(f"Iniciando el entrenamiento del modelo: {config['model']['name']}")
 
@@ -152,19 +184,22 @@ def main(config_path: str, mode_config_path: str = None):
     # Inicialización de las clases de entrenamiento
     train_epoch = TrainEpoch(
         model,
-        loss=loss,
+        loss=criterion,
         metrics=metrics,
         optimizer=optimizer,
         device=DEVICE,
         verbose=True,
+        data_size_limit=config['training']['subset_train_size']
     )
 
     valid_epoch = ValidEpoch(
         model,
-        loss=loss,
+        loss=criterion,
         metrics=metrics,
         device=DEVICE,
         verbose=True,
+        data_size_limit=config['training']['subset_valid_size'],
+        scheduler=scheduler # Si el scheduler usa la métrica, se pasa aquí
     )
 
     # BUCLE PRINCIPAL DE ENTRENAMIENTO
@@ -201,7 +236,8 @@ def main(config_path: str, mode_config_path: str = None):
                 break # Detiene el entrenamiento
 
         # Aplicar el paso del Learning Rate Scheduler
-        scheduler.step()
+        if 'scheduler' in locals(): # Si el scheduler fue inicializado
+            scheduler.step()
 
     writer.close()
 
