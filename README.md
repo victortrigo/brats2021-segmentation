@@ -35,15 +35,15 @@ Existen 4 archivos de configuración en `configs/`:
 - `deeplabv3sam_config.yaml` : DeepLabV3+ con SAM.
 - `config_test.yaml`: Activar el modo de prueba rápida (ej. 50 épocas, subsets 50/5/5)
 
-### Entrenamiento (dataset completo 999/125/125)
-
+## Entrenamiento 
+### Dataset completo (999/125/125)
 Para entrenar un modelo específico:
 
 ```bash
 python src/training.py --config configs/unet_config.yaml
 ```
 
-### Entrenamiento (dataset de prueba 50/5/5)
+### Dataset de prueba (50/5/5)
 
 Para entrenar un modelo específico:
 
@@ -79,6 +79,21 @@ Para monitorear el entrenamiento de un modelo:
 
 ```bash
 tensorboard --logdir runs/unet/
+```
+
+## Visualización de arquitecturas
+
+Cada script de modelo y módulo en `src/` puede ejecutarse directamente para imprimir en consola la arquitectura completa, incluyendo el número de capas y parámetros. Esto permite inspeccionar la estructura interna antes del entrenamiento.
+
+```bash
+python src/unet.py
+python src/deeplabv3.py
+python src/clcunet.py
+python src/deeplabv3sam.py
+python src/backbone.py
+python src/convs.py
+python src/sam.py
+
 ```
 
 ## Referencias
