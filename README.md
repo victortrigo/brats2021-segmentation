@@ -1,6 +1,6 @@
-# Brain Tumor Segmentation (BraTS) Challenge 2021
+# Brain Tumor Segmentation (BraTS) Challenge 2021 using U-Net, DeepLabv3+ and Segmented Attention Module (SAM)
 
-Este repositorio contiene el entrenamiento de modelos de deep learning como U-Net y DeepLabv3+; ademas de añadir modificaciones en sus respectivas arquitecturas, incorporando mecanismos de atención como SAM (Segmented attention module).
+Este proyecto implementa y compara modelos de segmentación (U-Net, DeepLabv3+) aplicados al dataset BraTS 2021, incorporando mecanismos de atención (SAM). Se incluyen configuraciones YAML, scripts modulares y notebooks de exploración.
 
 ## Contenido
 
