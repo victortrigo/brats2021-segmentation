@@ -1,5 +1,29 @@
-data/
-*.nii
-*.nii.gz
-*.pt
+# ----------------------------------------
+# DEPENDENCIAS
+# ----------------------------------------
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Cache de Python
 __pycache__/
+# *.pyc
+# *.pyd
+
+# ----------------------------------------
+# SALIDAS Y LOGS (Ignoramos todo lo que genera el entrenamiento)
+# ----------------------------------------
+logs/
+reports/
+models/
+*.pt
+*.pth
+# *.onnx
+
+# ----------------------------------------
+# DATOS
+# ----------------------------------------
+# Mantenemos esta línea, asumiendo que los archivos procesados NO deben subir a Git.
+/data/processed/
+

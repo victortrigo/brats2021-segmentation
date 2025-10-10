@@ -1,0 +1,21 @@
+name: brats2021
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pytorch
+  - torchvision
+  - torchaudio
+  - cudatoolkit=11.8 # Importante: ¡Verifica la versión de CUDA!
+  - numpy
+  - nibabel
+  - matplotlib
+  - tqdm
+  - opencv
+  - pip:
+    - segmentation-models-pytorch
+    - torchinfo
+    - tensorboard

@@ -1,0 +1,11 @@
+# config_test.yaml
+# Este archivo define la configuración para el Modo Prueba Rápida
+
+training:
+  epochs: 50             # Reducir las épocas para pruebas rápidas
+  patience: 10           # Reducir la paciencia (para que se detenga antes)
+  
+  # TAMAÑOS DE SUBSET PARA PRUEBAS RÁPIDAS
+  subset_train_size: 50
+  subset_valid_size: 5
+  subset_test_size: 5
