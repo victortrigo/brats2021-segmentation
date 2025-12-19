@@ -15,6 +15,7 @@ dependencies:
   - matplotlib
   - tqdm
   - opencv
+  - scikit-learn
   - pip:
     - segmentation-models-pytorch
     - torchinfo
