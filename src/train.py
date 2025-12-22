@@ -445,8 +445,10 @@ class TrainEpoch(Epoch):
         # Update weights
         self.optimizer.step()
 
-        # Optional: Update learning rate
-        if hasattr(self, 'scheduler'):
+        # Optional: Update learning rate (if scheduler provided)
+        # Note: For schedulers like ReduceLROnPlateau you should call
+        # scheduler.step(metric) after validation epoch, not per batch.
+        if self.scheduler is not None:
             self.scheduler.step()
 
         return loss, prediction

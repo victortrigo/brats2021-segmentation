@@ -531,18 +531,7 @@ class BackboneXception(nn.Module):
         >>> print(f"Low-level: {low_level.shape}")   # [1, 128, 32, 32, 32]
         >>> print(f"High-level: {high_level.shape}") # [1, 2048, 8, 8, 8]
         >>> 
-        >>> # Use in encoder
-        >>> class MyEncoder(nn.Module):
-        ...     def __init__(self):
-        ...         super().__init__()
-        ...         self.backbone = BackboneXception(4, 16)
-        ...         self.aspp = ASPP(2048, 256)
-        ...     
-        ...     def forward(self, x):
-        ...         low, high = self.backbone(x)
-        ...         high = self.aspp(high)
-        ...         return low, high
-        
+           
     Raises:
         ValueError: If output_stride is not 16 or 32
         
