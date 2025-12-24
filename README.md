@@ -1,60 +1,55 @@
 # Brain Tumor Segmentation (BraTS) Challenge 2021 using U-Net, DeepLabv3+ and Segmented Attention Module (SAM)
 
-Este proyecto implementa y compara modelos de segmentación (U-Net, DeepLabv3+) aplicados al dataset BraTS 2021, incorporando mecanismos de atención (SAM). Se incluyen configuraciones YAML, scripts modulares y notebooks de exploración.
+## Content
 
-## Contenido
+- `data/` : datset BraTS 2021
+- `models/` : models trainers
+- `src/` : Scripts de dataset, models, training, evaluate and prediction
 
-- `data/` : Directorio para almacenar los datos del BraTS 2021.
-- `models/` : Modelos entrenados.
-- `notebooks/` : Notebooks para exploración.
-- `src/` : Scripts de dataset, modelos, entrenamiento, evaluación y predicción.
-
-## Clonar repositorio
+## 1. Clone
 
 ```bash
 git clone https://github.com/victortrigo/brats2021-segmentation.git
-cd brats2021-segmentation
 ```
 
-## Instalación del entorno
+## 2. Enviroment
 
-Se recomienda usar Conda:
+Use Conda
 
 ```bash
-conda env create -f environment.yml
-conda activate brats2021
+pip install -r requirements.txt
 ```
 
-## Configuraciones
+## Configurations
 
-Existen 4 archivos de configuración en `configs/`:
+Configurations or hyperparameters `configs/`:
 
-- `unet_config.yaml` : Parámetros para entrenar la U-Net base.
-- `clcunet_config.yaml` : U-Net con módulo de atención SAM.
-- `deeplabv3_config.yaml` : DeepLabV3+ estándar.
-- `deeplabv3sam_config.yaml` : DeepLabV3+ con SAM.
-- `config_test.yaml`: Activar el modo de prueba rápida (ej. 50 épocas, subsets 50/5/5)
+- `unet_config.yaml` : U-Net 
+- `clcunet_config.yaml` : U-Net (CLCU-Net) whit SAM 
+- `deeplabv3_config.yaml` : DeepLabV3+ 
+- `deeplabv3sam_config.yaml` : DeepLabV3+ with SAM
+- `config_test.yaml`: test mode (ej. 50 epocs, subsets 50/5/5)
 
-## Entrenamiento 
-### Dataset completo (999/125/125)
-Para entrenar un modelo específico:
+## Train 
+Dataset full (999/125/125) and Dataset test (50/5/5)
+
 
 ```bash
-python src/training.py --config configs/unet_config.yaml
+# Train TEST to 4 models
+python main.py --mode test
+
+# Train FULL to 4 models
+python main.py --mode full
+
+# Train only a spycific models 
+python main.py --mode test --models unet clcunet
+python main.py --mode full --models deeplabv3 deeplabv3sam
 ```
 
-### Dataset de prueba (50/5/5)
 
-Para entrenar un modelo específico:
+## Evaluation
 
-```bash
-python src/training.py --config configs/deeplabv3_config.yaml --mode configs/config_test.yaml
-```
-
-
-## Evaluación
-
-Existen 4 modelos entrenados, cada uno con su best model correspondiente en `models/`:
+4 trained models in `models/`:
 
 - `best_model_unet.pth`
 - `best_model_clcunet.pth`
@@ -62,13 +57,13 @@ Existen 4 modelos entrenados, cada uno con su best model correspondiente en `mod
 - `best_model_deeplabv3sam.pth`
 
 ```bash
-python src/evaluate.py --model models/best_model_unet.pth
+pass
 ```
 
 
-## Visualización
+## Visualization
 
-TensorBoard para monitorear entrenamiento y métricas, dentro de `runs/`:
+TensorBoard monitoring train and metrics in `runs/`:
 
 - `runs/unet/`
 - `runs/clcunet/`
@@ -81,9 +76,7 @@ Para monitorear el entrenamiento de un modelo:
 tensorboard --logdir runs/unet/
 ```
 
-## Visualización de arquitecturas
-
-Cada script de modelo y módulo en `src/` puede ejecutarse directamente para imprimir en consola la arquitectura completa, incluyendo el número de capas y parámetros. Esto permite inspeccionar la estructura interna antes del entrenamiento.
+## Architeture visualization
 
 ```bash
 python src/unet.py
@@ -93,7 +86,7 @@ python src/deeplabv3sam.py
 python src/backbone.py
 python src/convs.py
 python src/sam.py
-
+python src/pooling.py
 ```
 
 ## Referencias
