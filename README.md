@@ -70,10 +70,9 @@ TensorBoard monitoring train and metrics in `runs/`:
 - `runs/deeplabv3/`
 - `runs/deeplabv3sam/`
 
-Para monitorear el entrenamiento de un modelo:
-
+Monitoring all models
 ```bash
-tensorboard --logdir runs/unet/
+tensorboard --logdir .\runs
 ```
 
 ## Architeture visualization
