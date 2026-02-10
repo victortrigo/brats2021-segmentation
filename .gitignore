@@ -17,6 +17,7 @@ __pycache__/
 logs/
 reports/
 models/
+runs/
 *.pt
 *.pth
 # *.onnx
