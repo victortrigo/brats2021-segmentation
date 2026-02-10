@@ -690,70 +690,23 @@ class Decoder(nn.Module):
 
 class Output(nn.Module):
     """
-    CLCU-Net Output Module with Three-Branch Prediction.
+    CLCU-Net Output Module with Refinement Block and 4-Channel Logits.
     
-    This module generates segmentation masks at three different scales (D1, D2, D3)
-    and progressively fuses them. Each branch predicts one tumor subregion:
-    - Branch D3 (coarse): Predicts ET (Enhancing Tumor)
-    - Branch D2 (medium): Predicts ED (Edema), guided by D3
-    - Branch D1 (fine): Predicts NCR (Necrotic Core), guided by D2
+    This module generates intermediate predictions at three scales and fuses them 
+    with fine decoder features to produce final refined logits.
     
-    Architecture:
-        D3 [B, 128, 32³] ──→ Conv1×1 ──→ Upsample(4) ──→ P3 (ET)
-                                                         ↓
-        D2 [B, 64, 64³] ───→ Conv1×1 ──┐             │
-                                        ├─ Fuse ──→ P2 (ED)
-        P3 upsampled ──────────────────┘             ↓
-                                                     │
-        D1 [B, 64, 128³] ──→ Conv1×1 ──┐             │
-                                        ├─ Fuse ──→ P1 (NCR)
-        P2 intermediate ───────────────┘
-        
-        Final: Concat(P1, P2, P3) + Background → [B, 4, 128³]
-    
-    Progressive Refinement:
-        1. P3 (coarsest): Direct prediction from D3
-        2. P2 (medium): Guided by P3 + D2 features
-        3. P1 (finest): Guided by P2 + D1 features
-        
-    Background Calculation:
-        Background = 1 - clamp(P1 + P2 + P3, max=1.0)
-        Ensures sum of probabilities ≤ 1.0
-    
-    Returns:
-        Tuple containing:
-            - final_mask_4ch: [B, 4, 128³] - (Background, NCR, ED, ET)
-            - (p1, p2, p3): Individual predictions for supervision
-            
-    Shape:
-        - Input d1: (B, 64, 128, 128, 128)
-        - Input d2: (B, 64, 64, 64, 64)
-        - Input d3: (B, 128, 32, 32, 32)
-        - Output final_mask: (B, 4, 128, 128, 128)
-        - Output p1: (B, 1, 128, 128, 128) - NCR
-        - Output p2: (B, 1, 128, 128, 128) - ED
-        - Output p3: (B, 1, 128, 128, 128) - ET
-        
-    Example:
-        >>> output_module = Output()
-        >>> d1 = torch.randn(1, 64, 128, 128, 128)
-        >>> d2 = torch.randn(1, 64, 64, 64, 64)
-        >>> d3 = torch.randn(1, 128, 32, 32, 32)
-        >>> 
-        >>> final_mask, (p1, p2, p3) = output_module(d1, d2, d3)
-        >>> print(f"Final: {final_mask.shape}")  # [1, 4, 128, 128, 128]
-        >>> print(f"P1 (NCR): {p1.shape}")       # [1, 1, 128, 128, 128]
-        >>> print(f"P2 (ED): {p2.shape}")        # [1, 1, 128, 128, 128]
-        >>> print(f"P3 (ET): {p3.shape}")        # [1, 1, 128, 128, 128]
+    Output Channels:
+        - Channel 0: Background
+        - Channel 1: NCR (Necrotic Core)
+        - Channel 2: ED (Edema)
+        - Channel 3: ET (Enhancing Tumor)
         
     Note:
-        - Uses sigmoid activation (NOT softmax)
-        - Each channel is independent probability
-        - During training, supervise (p1, p2, p3) separately
-        - During inference, use final_mask_4ch
+        Returns raw LOGITS. No activation (Sigmoid/Softmax) is applied here,
+        as it is handled by the Loss Function during training.
     """
 
-    def __init__(self):
+    def __init__(self, base_channels: int = 64):
         super().__init__()
 
         # ====================================================================
@@ -767,22 +720,33 @@ class Output(nn.Module):
         self.up_d2 = nn.Upsample(scale_factor=2, mode='trilinear', align_corners=False)
 
         # ====================================================================
-        # Prediction Heads
+        # Prediction Branches (Raw Logits per subregion)
         # ====================================================================
         
         # Branch 3: D3 → ET prediction
-        self.conv3 = nn.Conv3d(128, 1, kernel_size=1) # 128 ch → 1 ch
+        self.conv3 = nn.Conv3d(base_channels*2, 1, kernel_size=1) # 128 ch → 1 ch
 
         # Branch 2: D2 → ED prediction (guided by P3)
-        self.d2_reduce = nn.Conv3d(64, 1, kernel_size=1) # D2 → 1 ch
+        self.d2_reduce = nn.Conv3d(base_channels, 1, kernel_size=1) # D2 → 1 ch
         self.conv2 = nn.Conv3d(2, 1, kernel_size=1) # Fuse P3 + D2
 
         # Branch 1: D1 → NCR prediction (guided by P2)
-        self.d1_reduce = nn.Conv3d(64, 1, kernel_size=1) # D1 → 1 ch
+        self.d1_reduce = nn.Conv3d(base_channels, 1, kernel_size=1) # D1 → 1 ch
         self.conv1 = nn.Conv3d(2, 1, kernel_size=1) # Fuse P2 + D1
 
-        # Activation
-        self.sigmoid = nn.Sigmoid()
+
+        # ====================================================================
+        # Final Refine Block
+        # ====================================================================
+        total_in = base_channels + 3
+        self.refine_conv = nn.Sequential(
+            nn.Conv3d(total_in, 32, kernel_size=3, padding=1),
+            nn.BatchNorm3d(32),
+            nn.LeakyReLU(inplace=True)
+        )
+
+        self.final_sam = SAM(in_channels=32) 
+        self.output_conv = nn.Conv3d(32, 4, kernel_size=1)
 
     def forward(self, 
                 d1: torch.Tensor, 
@@ -843,18 +807,17 @@ class Output(nn.Module):
             >>> # Should be close to 1.0
         """
         # ====================================================================
-        # Branch 3: Coarse ET Prediction
+        # Branch 3: Coarse ET Logits
         # ====================================================================
         
         # D3 → full resolution
         x3 = self.up_d3(d3)  # [B, 128, 128, 128, 128]
 
         # Predict ET
-        c3 = self.conv3(x3)  # [B, 1, 128, 128, 128]
-        p3 = self.sigmoid(c3)
+        c3 = self.conv3(x3)  # [B, 1, 128, 128, 128] 
 
         # ====================================================================
-        # Branch 2: Medium ED Prediction (guided by P3)
+        # Branch 2: Medium ED Logits (guided by P3)
         # ====================================================================
         
         # D2 → full resolution
@@ -865,11 +828,10 @@ class Output(nn.Module):
 
         # Fuse with P3 guidance
         x2 = torch.cat([c3, c2_1], dim=1)  # [B, 2, 128, 128, 128]
-        c2 = self.conv2(x2)   # [B, 1, 128, 128, 128]
-        p2 = self.sigmoid(c2)
+        c2 = self.conv2(x2)   # [B, 1, 128, 128, 128] 
 
         # ====================================================================
-        # Branch 1: Fine NCR Prediction (guided by P2)
+        # Branch 1: Fine NCR Logits (guided by P2)
         # ====================================================================
         
         # Reduce D1 channels
@@ -877,29 +839,27 @@ class Output(nn.Module):
         
         # Fuse with P2 guidance (NOT c2, but c2_1 from D2)
         x1 = torch.cat([c2_1, c1_1], dim=1)  # [B, 2, 128, 128, 128]
-        c1 = self.conv1(x1)   # [B, 1, 128, 128, 128]
-        p1 = self.sigmoid(c1)
+        c1 = self.conv1(x1)   # [B, 1, 128, 128, 128] 
+        
 
         # ====================================================================
-        # Final Mask: Combine All Predictions + Background
+        # Final Refinement
         # ====================================================================
         
-        # Concatenate tumor predictions: [B, 3, 128, 128, 128]
-        final_mask = torch.cat([p1, p2, p3], dim=1)
+        # Combine D1 features + all 3 predicted tumor masks
+        tumor_features = torch.cat([c1, c2, c3], dim=1)
+        combined = torch.cat([d1, tumor_features], dim=1) # [B, 67, 128, 128, 128]
 
-        # Calculate background (ensure probabilities sum to ≤ 1)
-        # Background = 1 - (NCR + ED + ET), clamped to [0, 1]
-        background = 1 - torch.clamp(final_mask.sum(dim=1, keepdim=True), max=1.0)
-        
-        # Final 4-channel output: [B, 4, 128, 128, 128]
-        # Channel 0: Background
-        # Channel 1: NCR (P1)
-        # Channel 2: ED (P2)
-        # Channel 3: ET (P3)
-        final_mask_4ch = torch.cat([background, final_mask], dim=1)
+        # Refinement process (Conv + SAM)
+        x = self.refine_conv(combined)
+        x = self.final_sam(x) 
 
-        return final_mask_4ch, (p1, p2, p3)
+        # Generate final 4-channel logits [BG, NCR, ED, ET]
+        # Canal 0: Background, Canal 1: NCR, Canal 2: ED, Canal 3: ET
+        final_4ch_logits = self.output_conv(x)
 
+        return final_4ch_logits, (c1, c2, c3)
+    
 
 # ============================================================================
 # Complete CLCU-Net Model
