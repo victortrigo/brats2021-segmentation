@@ -6,3 +6,4 @@ torch
 torchinfo
 tqdm
 tensorboard 
+optuna>=3.0.0
