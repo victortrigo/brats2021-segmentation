@@ -1,0 +1,5 @@
+Architecture,Uses_SAM,Model_Full_Name,Seed,Batch_Size,Best_Fscore,Best_IoU
+UNet,No,UNet,42,2,0.85,0.75
+UNet,Yes,CLCUNet,42,2,0.85,0.75
+DeepLab,No,DeepLabV3+,42,1,0.85,0.75
+DeepLab,Yes,DeepLabV3+SAM,42,1,0.85,0.75

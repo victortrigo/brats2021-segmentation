@@ -1,92 +1,104 @@
-# Brain Tumor Segmentation (BraTS) Challenge 2021 using U-Net, DeepLabv3+ and Segmented Attention Module (SAM)
+# Brain Tumor Segmentation (BraTS) Challenge 2021
+### Experimental Pipeline using U-Net, DeepLabV3+, CLCUNet, and SAM (Segmented Attention Module)
 
-## Content
+This repository contains a fully automated Deep Learning pipeline designed for statistical robustness in medical image segmentation. It features dynamic Hyperparameter Optimization (HPO), Factorial Design training across multiple seeds, and comprehensive clinical metric evaluation for Permutation ANOVA analysis.
+
+## 📂 Project Structure
+
+- `data/processed/` : Preprocessed BraTS 2021 dataset (X_train, y_train, X_val, X_test).
+- `src/` : Source code including models, data loaders, training engines, and tests.
+- `experiment/` : Auto-generated directory containing all pipeline outputs (YAMLs, weights, logs, and CSVs).
+
 
 - `data/` : datset BraTS 2021
 - `models/` : models trainers
 - `src/` : Scripts de dataset, models, training, evaluate and prediction
 
-## 1. Clone
+## 🛠️ 1. Clone & Environment
 
 ```bash
 git clone https://github.com/victortrigo/brats2021-segmentation.git
 ```
 
-## 2. Enviroment
-
-Use Conda
+It is highly recommended to use Conda for environment management:
 
 ```bash
+conda create -n brats2021 python=3.9
+conda activate brats2021
 pip install -r requirements.txt
 ```
 
-## Configurations
+## 2. The 3-Phase Experimental Pipeline
 
-Configurations or hyperparameters `configs/`:
+The entire experiment is orchestrated through main.py. This ensures reproducibility and clean execution.
 
-- `unet_config.yaml` : U-Net 
-- `clcunet_config.yaml` : U-Net (CLCU-Net) whit SAM 
-- `deeplabv3_config.yaml` : DeepLabV3+ 
-- `deeplabv3sam_config.yaml` : DeepLabV3+ with SAM
-- `config_test.yaml`: test mode (ej. 50 epocs, subsets 50/5/5)
+### Phase 1: Hyperparameter Optimization (HPO)
 
-## Train 
-Dataset full (999/125/125) and Dataset test (50/5/5)
-
+Uses Optuna to find the best learning rate, weight decay, and batch size for each model.
 
 ```bash
-# Train TEST to 4 models
-python main.py --mode test
+python main.py --mode hpo
+```
 
-# Train FULL to 4 models
-python main.py --mode full
+* Outputs: Optimal configuration files saved in experiment/phase1_hpo/best_params_[model].yaml.
 
-# Train only a spycific models 
-python main.py --mode test --models unet clcunet
-python main.py --mode full --models deeplabv3 deeplabv3sam
+
+### Phase 2: Factorial Training
+
+Trains all models dynamically using the parameters found in Phase 1 across multiple statistical seeds (e.g., 42, 123, 2026, 7, 999).
+
+```bash
+python main.py --mode phase2
+```
+
+* Outputs: Trained weights (.pth), TensorBoard logs, and a general training summary in experiment/phase2_factorial/factorial_results.csv.
+
+
+### Phase 3: Clinical Evaluation
+
+Loads all trained models and evaluates them on the unseen test set, calculating per-class clinical metrics (Dice, HD95, Sensitivity, Specificity) for NCR, ED, and ET regions.
+
+```bash
+python main.py --mode phase3
+```
+
+* Outputs: The final statistical dataset ready for R/Python analysis in experiment/phase3_evaluation/anova_clinical_dataset.csv
+
+
+### 🧹 Utilities: Reset Environment
+
+To ensure a clean slate before a new major experiment, you can securely delete all previous runs (YAMLs, weights, and logs).
+
+```bash
+python main.py --mode reset
 ```
 
 
-## Evaluation
+## 3. Running Unit Tests
 
-4 trained models in `models/`:
+This repository includes a robust testing suite using mock datasets to verify pipeline integrity without requiring heavy GPU computation.
 
-- `best_model_unet.pth`
-- `best_model_clcunet.pth`
-- `best_model_deeplabv3.pth`
-- `best_model_deeplabv3sam.pth`
+Run the tests to ensure your environment is set up correctly:
 
 ```bash
-pass
+python -m unittest src/test_hpo_mock.py
+python -m unittest src/test_training.py
+python -m unittest src/test_phase2_factorial.py
+python -m unittest src/test_phase3_evaluate.py
 ```
 
+## 4. Visualization (TensorBoard)
 
-## Visualization
+Track the Loss, IoU, and Dice Score (Fscore) curves in real-time during Phase 2 training. Since each seed has its own folder, you can compare multiple runs simultaneously.
 
-TensorBoard monitoring train and metrics in `runs/`:
-
-- `runs/unet/`
-- `runs/clcunet/`
-- `runs/deeplabv3/`
-- `runs/deeplabv3sam/`
-
-Monitoring all models
-```bash
-tensorboard --logdir .\runs
-```
-
-## Architeture visualization
 
 ```bash
-python src/unet.py
-python src/deeplabv3.py
-python src/clcunet.py
-python src/deeplabv3sam.py
-python src/backbone.py
-python src/convs.py
-python src/sam.py
-python src/pooling.py
+tensorboard --logdir experiment/phase2_factorial
 ```
+
+Then, open your browser at http://localhost:6006.
+
+
 
 ## Referencias
 

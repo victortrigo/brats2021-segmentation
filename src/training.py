@@ -49,12 +49,14 @@ Configuration Structure:
 
 import os
 from datetime import datetime
-from typing import Any, Dict
+from typing import Dict, Any, Tuple
 
+import random
+import numpy as np
 import torch
 import yaml
 
-from torch.optim import Adam
+from torch.optim import Adam, AdamW
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.tensorboard import SummaryWriter
 
@@ -66,6 +68,33 @@ import unet
 
 from metrics import Accuracy, DiceLoss, Fscore, IoU, JaccardLoss, Precision, Recall
 from train import TrainEpoch, ValidEpoch
+
+def set_seed(seed: int = 42) -> None:
+    """
+    Freezes all sources of randomness to ensure full code reproducibility.
+    
+    Args:
+        seed (int): The seed value to use for all random number generators. Default is 42.
+    """
+    # 1. Basic Python and environment variables
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+
+    # 2. NumPy (Affects train_test_split and other random selections)
+    np.random.seed(seed)
+
+    # 3. PyTorch (CPU and GPU)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed) # For multi-GPU setups
+
+    # 4. CuDNN (NVIDIA backend for convolutions)
+    # IMPORTANT: Deterministic mode ensures identical results across runs,
+    # but it may slightly slow down the training process.
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    print(f"🌱 Global seed set to: {seed}")
 
 
 # ============================================================================
@@ -156,6 +185,153 @@ def get_model(config: Dict[str, Any]) -> torch.nn.Module:
     else:
         raise ValueError(f"Unsupported model: {model_name}")
         
+
+# ============================================================================
+# Training Pipeline for Full Training Experiment
+# ============================================================================
+
+def run_experiment(
+    model_name: str, 
+    seed: int, 
+    best_params: Dict[str, Any], 
+    run_dir: str, 
+    train_loader: torch.utils.data.DataLoader, 
+    valid_loader: torch.utils.data.DataLoader, 
+    device: str = 'cuda:0'
+) -> Tuple[float, float]:    
+    """
+    Dynamic training engine adapted for the Factorial Design (Phase 2).
+    
+    This function runs a SINGLE training trial for a specific model and a SINGLE seed.
+    The outer loop (iterating through all models and all seeds) is handled externally 
+    by `run_phase2_factorial.py`.
+    
+    Args:
+        model_name (str): Name of the model architecture (e.g., 'UNet', 'CLCUNet').
+        seed (int): The specific random seed for this training trial.
+        best_params (Dict[str, Any]): Hyperparameters found by Optuna in Phase 1.
+        run_dir (str): Directory where the model weights and logs will be saved.
+        train_loader (DataLoader): DataLoader for the training set.
+        valid_loader (DataLoader): DataLoader for the validation set.
+        device (str): Device to run the training on (default: 'cuda:0').
+        
+    Returns:
+        Tuple[float, float]: The best Dice Score and the best IoU achieved during training.
+    """
+    print(f"\n--- Starting Training Engine for {model_name} | Seed: {seed} ---")
+
+    # 1. Set the EXACT statistical seed for this specific trial
+    # (Ensure set_seed is defined in your utils or imported into this file)
+    set_seed(seed)
+
+    # 2. Instantiate the model
+    # Using the existing get_model() factory from training.py
+    model = get_model({"model": {"name": model_name}}).to(device)
+
+    # 3. Configure the Optimizer with the "recipe" from the YAML
+    lr = float(best_params.get('lr', 1e-3))
+    wd = float(best_params.get('weight_decay', 1e-5))
+    opt_name = best_params.get('optimizer', 'Adam')
+
+    if opt_name == 'AdamW':
+        optimizer = AdamW(model.parameters(), lr=lr, weight_decay=wd)
+    else:
+        optimizer = Adam(model.parameters(), lr=lr, weight_decay=wd)
+
+    # 4. Configure Scheduler and Loss Function
+    scheduler = StepLR(optimizer, step_size=50, gamma=0.1)
+
+    # Special handling for CLCUNet (requires sigmoid activation)
+    if model_name == "CLCUNet":
+        criterion = DiceLoss(activation="sigmoid")
+        print("  Using DiceLoss with 'sigmoid' activation for CLCUNet.")
+    else:
+        criterion = DiceLoss()
+        print("  Using DiceLoss by default.")
+        
+    criterion.to(device)
+
+    # 5. Metrics and Epoch Handlers
+    # Make sure DiceScore is imported if you are using it
+    metrics = [
+        IoU(threshold=0.5),
+        Accuracy(threshold=0.5),
+        Fscore(threshold=0.5),
+        Recall(threshold=0.5),
+        Precision(threshold=0.5),
+    ]
+
+    train_epoch = TrainEpoch(
+        model, loss=criterion, metrics=metrics, optimizer=optimizer, device=device, verbose=True
+    )
+    valid_epoch = ValidEpoch(
+        model, loss=criterion, metrics=metrics, device=device, verbose=True
+    )
+
+    # 6. TensorBoard Setup (Saving logs inside the specific run directory)
+    os.makedirs(os.path.join(run_dir, 'logs'), exist_ok=True)
+    writer = SummaryWriter(os.path.join(run_dir, 'logs'))
+
+    # ========================================================================
+    # MAIN TRAINING LOOP
+    # ========================================================================
+    EPOCHS = 200 # Maximum number of epochs
+    PATIENCE = 50
+    
+    max_iou = 0.0 
+    best_fscore = 0.0  # Dice score
+    patience_counter = 0 
+
+    for epoch in range(1, EPOCHS + 1):
+        print(f'\nEpoch: {epoch}/{EPOCHS}')
+
+        # Run training and validation phases
+        train_logs = train_epoch.run(train_loader)
+        valid_logs = valid_epoch.run(valid_loader)
+        
+        scheduler.step()
+
+        # Log metrics to TensorBoard
+        if 'dice_loss' in train_logs:
+            writer.add_scalar('Loss/train', train_logs['dice_loss'], epoch)
+        if 'dice_loss' in valid_logs:
+            writer.add_scalar('Loss/validation', valid_logs['dice_loss'], epoch)
+        if 'iou_score' in train_logs:
+            writer.add_scalar('IoU/train', train_logs['iou_score'], epoch)
+        if 'iou_score' in valid_logs:
+            writer.add_scalar('IoU/validation', valid_logs['iou_score'], epoch)
+        if 'fscore' in train_logs:
+            writer.add_scalar('Fscore/train', train_logs['fscore'], epoch)
+        if 'fscore' in valid_logs:
+            writer.add_scalar('Fscore/validation', valid_logs['fscore'], epoch)
+
+        valid_iou = float(valid_logs.get('iou_score', 0.0))
+        valid_fscore = float(valid_logs.get('fscore', 0.0)) 
+
+        # Early Stopping and Checkpointing Logic
+        if max_iou < valid_iou:
+            max_iou = valid_iou
+            best_fscore = valid_fscore
+            patience_counter = 0
+            
+            # Save the .pth file inside the run_dir
+            safe_name = model_name.replace("+", "plus").lower()
+            model_path = os.path.join(run_dir, f"{safe_name}_seed{seed}.pth")
+            torch.save(model.state_dict(), model_path)
+            
+            print(f'🔥 Improvement detected! Model saved to: {model_path}')
+        else:
+            patience_counter += 1
+            if patience_counter >= PATIENCE:
+                print(f'🛑 Early stopping at epoch {epoch}. No improvements in {PATIENCE} consecutive epochs.')
+                break
+
+    writer.close()
+    print(f"✅ Training completed for {model_name} (Seed {seed}). Best IoU: {max_iou:.4f}")
+    
+    # Return the best scores to the main orchestrator script
+    return best_fscore, max_iou
+
 
 # ============================================================================
 # Main Training Pipeline

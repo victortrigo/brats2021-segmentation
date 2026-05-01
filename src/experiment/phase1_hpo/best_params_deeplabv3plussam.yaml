@@ -1,0 +1,5 @@
+batch_size: 1
+lr: 0.004086857030664585
+optimizer: AdamW
+use_cosine_scheduler: false
+weight_decay: 3.622788592955038e-05
